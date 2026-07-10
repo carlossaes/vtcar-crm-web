@@ -34,3 +34,15 @@ export function createLead(data) {
 export function updateLeadStage(id, stage) {
   return request(`/api/leads/${id}`, { method: 'PATCH', body: JSON.stringify({ stage }) })
 }
+
+export function getLeadMessages(id) {
+  return request(`/api/leads/${id}/messages`)
+}
+
+export function getLeadCoach(id) {
+  return request(`/api/leads/${id}/coach`)
+}
+
+export function regenerateLeadCoach(id) {
+  return request(`/api/leads/${id}/coach`, { method: 'POST' })
+}
