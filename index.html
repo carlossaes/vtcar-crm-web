@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0B0D10" />
+    <meta name="theme-color" content="#F6F7F9" />
     <title>VT Car CRM</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,10 +12,13 @@
       rel="stylesheet"
     />
     <script>
-      // Aplica o tema salvo antes do React montar, pra nao piscar branco.
+      // O CRM abre no tema claro. O escuro so entra se a pessoa tiver ligado
+      // no botao da barra de cima — a escolha dela fica salva e continua
+      // valendo nas proximas visitas. Roda antes do React montar pra nao
+      // piscar de um tema pro outro.
       try {
-        var t = localStorage.getItem('vtcar_theme')
-        document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark')
+        var t = localStorage.getItem('vtcar_theme_v2')
+        document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light')
       } catch (e) {}
     </script>
   </head>
