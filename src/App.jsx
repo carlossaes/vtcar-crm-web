@@ -9,6 +9,12 @@ import Leads from './pages/Leads'
 import Pipeline from './pages/Pipeline'
 import { getApiBase, setApiBase, getLeads, updateLeadStage } from './api'
 
+// Chave nova de proposito. A anterior ("vtcar_theme") era gravada na montagem,
+// entao quem so abriu o CRM enquanto o escuro era padrao ficou com "dark"
+// salvo sem nunca ter escolhido. Com a chave nova, todo mundo volta pro claro
+// e so fica no escuro quem clicar no botao.
+const THEME_KEY = 'vtcar_theme_v2'
+
 const PAGES = {
   dashboard: { title: 'Dashboard', subtitle: 'Visão geral da operação' },
   pipeline: { title: 'Pipeline de vendas', subtitle: 'Arraste o lead pelo funil' },
@@ -40,21 +46,32 @@ const PAGES = {
 }
 
 function usePersistedTheme() {
+  // Claro e o padrao; escuro so se a pessoa tiver escolhido. O valor real ja
+  // foi aplicado no <html> pelo script do index.html, entao aqui so lemos.
   const [theme, setTheme] = useState(() => {
-    if (typeof document === 'undefined') return 'dark'
-    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'
+    if (typeof document === 'undefined') return 'light'
+    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
   })
 
+  // So aplica no <html>; nao grava nada aqui. Gravar na montagem faria o
+  // padrao virar "escolha" da pessoa sem ela ter clicado em nada.
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    try {
-      localStorage.setItem('vtcar_theme', theme)
-    } catch (e) {
-      /* modo privado: só não persiste */
-    }
   }, [theme])
 
-  return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))]
+  const toggle = () => {
+    setTheme((atual) => {
+      const proximo = atual === 'dark' ? 'light' : 'dark'
+      try {
+        localStorage.setItem(THEME_KEY, proximo)
+      } catch (e) {
+        /* modo privado: so nao persiste */
+      }
+      return proximo
+    })
+  }
+
+  return [theme, toggle]
 }
 
 export default function App() {
