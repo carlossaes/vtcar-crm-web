@@ -2,19 +2,131 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================================================
+   VT Car CRM — design tokens
+   Tudo em triplas RGB pra que o Tailwind consiga aplicar opacidade
+   (ex: bg-brand/10). Trocar de tema = trocar essas variaveis, nada mais.
+   ========================================================================= */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --plane: 11 13 16;
+  --surface: 20 23 28;
+  --surface-2: 27 31 38;
+  --surface-3: 35 40 49;
+  --line: 38 43 52;
+  --line-strong: 55 62 74;
+
+  --ink: 242 244 247;
+  --ink-2: 154 163 178;
+  --ink-3: 107 116 128;
+
+  --brand: 230 57 70;
+  --brand-hover: 255 107 117;
+  --brand-ink: 255 255 255;
+
+  /* Funil / estagios — rampa ordinal de um unico tom (claro -> escuro).
+     Validada: L monotonica, gaps >= 0.06, ponta clara 2.71:1 no surface. */
+  --stage-1: 183 211 246;
+  --stage-2: 134 182 239;
+  --stage-3: 85 152 231;
+  --stage-4: 42 120 214;
+  --stage-5: 28 92 171;
+
+  /* Categoricas — 3 slots, all-pairs PASS em CVD e visao normal. */
+  --series-1: 57 135 229;
+  --series-2: 217 89 38;
+  --series-3: 25 158 112;
+  --series-other: 107 116 128;
+
+  --grid: 38 43 52;
+  --axis: 137 135 129;
+
+  --good: 12 163 12;
+  --critical: 208 59 59;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --plane: 246 247 249;
+  --surface: 255 255 255;
+  --surface-2: 241 243 246;
+  --surface-3: 232 236 241;
+  --line: 227 231 237;
+  --line-strong: 203 210 220;
+
+  --ink: 14 17 22;
+  --ink-2: 90 100 114;
+  --ink-3: 128 138 152;
+
+  --brand: 200 30 44;
+  --brand-hover: 230 57 70;
+  --brand-ink: 255 255 255;
+
+  /* Mesma rampa, degraus escolhidos pro fundo claro (ponta clara 2.11:1). */
+  --stage-1: 134 182 239;
+  --stage-2: 85 152 231;
+  --stage-3: 42 120 214;
+  --stage-4: 28 92 171;
+  --stage-5: 16 66 129;
+
+  --series-1: 42 120 214;
+  --series-2: 235 104 52;
+  --series-3: 27 175 122;
+  --series-other: 128 138 152;
+
+  --grid: 225 224 217;
+  --axis: 137 135 129;
+
+  --good: 0 99 0;
+  --critical: 208 59 59;
+}
+
+html {
+  background: rgb(var(--plane));
+}
+
 body {
-  @apply bg-bg text-text;
-  font-family: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+  @apply bg-plane text-ink antialiased;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* Colunas que precisam alinhar verticalmente usam algarismos tabulares. */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2e3250;
-  border-radius: 3px;
+  background: rgb(var(--line-strong));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--ink-3));
+}
+
+/* Foco visivel e consistente em todo controle interativo. */
+:where(button, a, input, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--brand));
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

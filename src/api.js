@@ -1,11 +1,22 @@
 const STORAGE_KEY = 'vtcar_api_base'
 
+// Padrao usado quando ninguem configurou nada ainda — assim o CRM ja abre
+// conectado em vez de exigir o passo manual de "Conectar backend".
+// Um valor salvo no navegador sempre ganha deste.
+export const DEFAULT_API_BASE = 'https://vtcar-gptmaker-integration-production.up.railway.app'
+
 export function getApiBase() {
-  return (localStorage.getItem(STORAGE_KEY) || '').trim()
+  const saved = (localStorage.getItem(STORAGE_KEY) || '').trim()
+  return saved || DEFAULT_API_BASE
 }
 
 export function setApiBase(url) {
-  localStorage.setItem(STORAGE_KEY, url.trim().replace(/\/$/, ''))
+  const clean = url.trim().replace(/\/+$/, '')
+  if (!clean) {
+    localStorage.removeItem(STORAGE_KEY)
+    return
+  }
+  localStorage.setItem(STORAGE_KEY, clean)
 }
 
 async function request(path, options = {}) {
