@@ -4,11 +4,19 @@ import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react'
 
 function useCountUp(target, duration = 700) {
   const [value, setValue] = useState(0)
+
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const semAnimacao =
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.hidden
+
+    // Em aba de fundo o navegador congela o requestAnimationFrame, e a
+    // contagem ficava parada num numero errado — 85 no lugar de 201, por
+    // exemplo. Aqui a gente simplesmente nao anima e ja mostra o valor certo.
+    if (semAnimacao) {
       setValue(target)
       return
     }
+
     let start = null
     let raf
     const step = (ts) => {
@@ -18,10 +26,24 @@ function useCountUp(target, duration = 700) {
       const eased = 1 - Math.pow(1 - progress, 3)
       setValue(Math.round(eased * target))
       if (progress < 1) raf = requestAnimationFrame(step)
+      else setValue(target)
     }
     raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
+
+    // Rede de seguranca: aconteca o que acontecer com a animacao, depois do
+    // tempo previsto o numero exibido e o numero real.
+    const guarda = setTimeout(() => setValue(target), duration + 500)
+    // Se a aba voltar pro primeiro plano no meio do caminho, corrige na hora.
+    const aoVoltar = () => !document.hidden && setValue(target)
+    document.addEventListener('visibilitychange', aoVoltar)
+
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(guarda)
+      document.removeEventListener('visibilitychange', aoVoltar)
+    }
   }, [target, duration])
+
   return value
 }
 
