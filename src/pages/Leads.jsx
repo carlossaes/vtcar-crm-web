@@ -3,20 +3,10 @@ import { motion } from 'framer-motion'
 import { Users2, SearchX } from 'lucide-react'
 import { ChannelBadge, StageBadge, STAGE_META, STAGE_ORDER } from '../components/Badge'
 import EmptyState from '../components/EmptyState'
+import { displayName, formatPhone, hasName, initials } from '../format'
 import LeadModal from '../components/LeadModal'
 
 const FILTERS = [{ id: 'todos', label: 'Todos' }, ...STAGE_ORDER.map((s) => ({ id: s, label: STAGE_META[s].label }))]
-
-function initials(name) {
-  if (!name) return '—'
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0])
-    .join('')
-    .toUpperCase()
-}
 
 export default function Leads({ leads, search, onMoveStage }) {
   const [selected, setSelected] = useState(null)
@@ -31,6 +21,7 @@ export default function Leads({ leads, search, onMoveStage }) {
       (l) =>
         (l.name || '').toLowerCase().includes(q) ||
         (l.phone || '').includes(q) ||
+        (formatPhone(l.phone) || '').includes(q) ||
         (l.channel || '').toLowerCase().includes(q) ||
         (l.vehicleInterest || '').toLowerCase().includes(q)
     )
@@ -85,16 +76,21 @@ export default function Leads({ leads, search, onMoveStage }) {
                   <td className="py-3 px-5">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-surface2 border border-line grid place-items-center text-[11px] font-semibold text-ink2 shrink-0">
-                        {initials(lead.name)}
+                        {initials(lead)}
                       </div>
-                      <span className="font-medium text-[13.5px]">{lead.name || 'Sem nome'}</span>
+                      <span
+                        className={`text-[13.5px] ${hasName(lead) ? 'font-medium' : 'text-ink3 tnum'}`}
+                        title={hasName(lead) ? undefined : 'Esse contato não tem nome no perfil do WhatsApp'}
+                      >
+                        {displayName(lead)}
+                      </span>
                     </div>
                   </td>
                   <td className="py-3 px-3">
                     <ChannelBadge channel={lead.channel} />
                   </td>
                   <td className="py-3 px-3 text-[13px] text-ink2">{lead.vehicleInterest || 'A confirmar'}</td>
-                  <td className="py-3 px-3 text-[13px] text-ink2 tnum">{lead.phone || '—'}</td>
+                  <td className="py-3 px-3 text-[13px] text-ink2 tnum">{formatPhone(lead.phone) || '—'}</td>
                   <td className="py-3 px-3">
                     <StageBadge stage={lead.stage} />
                   </td>

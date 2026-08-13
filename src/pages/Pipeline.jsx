@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GripVertical, Inbox } from 'lucide-react'
 import { ChannelBadge, STAGE_META } from '../components/Badge'
+import { displayName, formatPhone } from '../format'
 import LeadModal from '../components/LeadModal'
 
 // O funil inteiro, incluindo as duas saidas (fechado e perdido).
@@ -46,7 +47,7 @@ function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, onDragE
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <div className="text-[13.5px] font-semibold truncate">{lead.name || 'Sem nome'}</div>
+          <div className="text-[13.5px] font-semibold truncate">{displayName(lead)}</div>
           <div className="text-[12px] text-ink2 truncate mt-0.5">{lead.vehicleInterest || 'Interesse a confirmar'}</div>
         </div>
         <GripVertical
@@ -75,6 +76,7 @@ export default function Pipeline({ leads, search, onMoveStage }) {
       (l) =>
         (l.name || '').toLowerCase().includes(q) ||
         (l.phone || '').includes(q) ||
+        (formatPhone(l.phone) || '').includes(q) ||
         (l.channel || '').toLowerCase().includes(q) ||
         (l.vehicleInterest || '').toLowerCase().includes(q)
     )
