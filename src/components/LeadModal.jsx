@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Sparkles, Copy, Check, RefreshCw, MessagesSquare } from 'lucide-react'
 import { ChannelBadge, StageBadge, STAGE_META } from './Badge'
 import EmptyState from './EmptyState'
+import { displayName, formatPhone } from '../format'
 import { getLeadMessages, getLeadCoach, regenerateLeadCoach } from '../api'
 
 const MOVABLE = ['novo', 'qualificado', 'proposta', 'negociacao', 'fechado', 'perdido']
@@ -197,7 +198,7 @@ export default function LeadModal({ lead, onClose, onMoveStage }) {
           >
             <header className="sticky top-0 bg-surface/95 backdrop-blur border-b border-line px-6 py-4 flex items-start justify-between gap-4 z-10">
               <div className="min-w-0">
-                <h2 className="text-[17px] font-bold tracking-tight truncate">{lead.name || 'Sem nome'}</h2>
+                <h2 className="text-[17px] font-bold tracking-tight truncate">{displayName(lead)}</h2>
                 <div className="flex gap-1.5 mt-2">
                   <ChannelBadge channel={lead.channel} />
                   <StageBadge stage={lead.stage} />
@@ -214,7 +215,7 @@ export default function LeadModal({ lead, onClose, onMoveStage }) {
 
             <div className="px-6 py-5 space-y-5">
               <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                <Field label="Telefone" value={lead.phone} />
+                <Field label="Telefone" value={formatPhone(lead.phone)} />
                 <Field label="E-mail" value={lead.email} />
                 <Field label="Veículo de interesse" value={lead.vehicleInterest || 'A confirmar'} />
                 <Field
