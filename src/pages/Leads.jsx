@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
 import { Users2, SearchX } from 'lucide-react'
 import { ChannelBadge, StageBadge, STAGE_META, STAGE_ORDER } from '../components/Badge'
 import EmptyState from '../components/EmptyState'
@@ -62,12 +61,9 @@ export default function Leads({ leads, search, onMoveStage }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((lead, i) => (
-                <motion.tr
+              {filtered.map((lead) => (
+                <tr
                   key={lead.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: Math.min(i * 0.02, 0.3) }}
                   onClick={() => setSelected(lead)}
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && setSelected(lead)}
@@ -97,7 +93,7 @@ export default function Leads({ leads, search, onMoveStage }) {
                   <td className="py-3 px-5 text-[13px] text-ink3 tnum text-right">
                     {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('pt-BR') : '—'}
                   </td>
-                </motion.tr>
+                </tr>
               ))}
             </tbody>
           </table>

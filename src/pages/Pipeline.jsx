@@ -39,8 +39,8 @@ function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, onDragE
         }
       }}
       tabIndex={0}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: dragging ? 0.4 : 1, y: 0 }}
+      initial={false}
+      animate={{ opacity: dragging ? 0.4 : 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ duration: 0.16 }}
       className="group bg-surface border border-line rounded-control p-3 cursor-grab active:cursor-grabbing hover:border-lineStrong transition-colors shadow-card"
