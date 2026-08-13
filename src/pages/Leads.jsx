@@ -1,66 +1,125 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ChannelBadge, StageBadge } from '../components/Badge'
+import { Users2, SearchX } from 'lucide-react'
+import { ChannelBadge, StageBadge, STAGE_META, STAGE_ORDER } from '../components/Badge'
+import EmptyState from '../components/EmptyState'
 import LeadModal from '../components/LeadModal'
+
+const FILTERS = [{ id: 'todos', label: 'Todos' }, ...STAGE_ORDER.map((s) => ({ id: s, label: STAGE_META[s].label }))]
+
+function initials(name) {
+  if (!name) return '—'
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase()
+}
 
 export default function Leads({ leads, search, onMoveStage }) {
   const [selected, setSelected] = useState(null)
+  const [filter, setFilter] = useState('todos')
+
+  const byStage = useMemo(() => (filter === 'todos' ? leads : leads.filter((l) => l.stage === filter)), [leads, filter])
 
   const filtered = useMemo(() => {
-    if (!search) return leads
+    if (!search) return byStage
     const q = search.toLowerCase()
-    return leads.filter(
-      (l) => (l.name || '').toLowerCase().includes(q) || (l.phone || '').includes(q) || (l.channel || '').toLowerCase().includes(q)
+    return byStage.filter(
+      (l) =>
+        (l.name || '').toLowerCase().includes(q) ||
+        (l.phone || '').includes(q) ||
+        (l.channel || '').toLowerCase().includes(q) ||
+        (l.vehicleInterest || '').toLowerCase().includes(q)
     )
-  }, [leads, search])
+  }, [byStage, search])
 
   return (
-    <div className="bg-bg2 border border-border rounded-xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-bold">Todos os Leads ({filtered.length})</span>
-      </div>
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="text-left text-[11px] uppercase tracking-wide text-text2 border-b border-border">
-            <th className="pb-2.5 px-3">Nome</th>
-            <th className="pb-2.5 px-3">Canal</th>
-            <th className="pb-2.5 px-3">Interesse</th>
-            <th className="pb-2.5 px-3">Telefone</th>
-            <th className="pb-2.5 px-3">Status</th>
-            <th className="pb-2.5 px-3">Data</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((lead, i) => (
-            <motion.tr
-              key={lead.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.03 }}
-              onClick={() => setSelected(lead)}
-              className="border-b border-border last:border-0 cursor-pointer hover:bg-bg3 transition-colors"
+    <section className="bg-surface border border-line rounded-card shadow-card overflow-hidden">
+      <header className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-line">
+        <h2 className="text-[13.5px] font-semibold mr-auto">
+          Leads <span className="text-ink3 font-normal tnum">({filtered.length})</span>
+        </h2>
+        <div className="flex items-center gap-1 bg-surface2 border border-line rounded-control p-0.5">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`px-2.5 py-1 rounded-[7px] text-[12px] font-medium transition-colors ${
+                filter === f.id ? 'bg-surface text-ink shadow-card' : 'text-ink2 hover:text-ink'
+              }`}
             >
-              <td className="p-3 font-semibold text-sm">{lead.name || 'Sem nome'}</td>
-              <td className="p-3">
-                <ChannelBadge channel={lead.channel} />
-              </td>
-              <td className="p-3 text-sm">{lead.vehicleInterest || 'A confirmar'}</td>
-              <td className="p-3 text-sm">{lead.phone || '—'}</td>
-              <td className="p-3">
-                <StageBadge stage={lead.stage} />
-              </td>
-              <td className="p-3 text-sm text-text2">{new Date(lead.createdAt).toLocaleDateString('pt-BR')}</td>
-            </motion.tr>
+              {f.label}
+            </button>
           ))}
-          {filtered.length === 0 && (
-            <tr>
-              <td colSpan={6} className="p-6 text-center text-text2 text-sm">
-                Nenhum lead ainda. Assim que alguém mandar mensagem pra Vitória, aparece aqui.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+        </div>
+      </header>
+
+      {filtered.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="text-left text-micro uppercase font-semibold text-ink3 bg-surface2/60">
+                <th className="py-2.5 px-5 font-semibold">Lead</th>
+                <th className="py-2.5 px-3 font-semibold">Canal</th>
+                <th className="py-2.5 px-3 font-semibold">Interesse</th>
+                <th className="py-2.5 px-3 font-semibold">Telefone</th>
+                <th className="py-2.5 px-3 font-semibold">Estágio</th>
+                <th className="py-2.5 px-5 font-semibold text-right">Entrada</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((lead, i) => (
+                <motion.tr
+                  key={lead.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: Math.min(i * 0.02, 0.3) }}
+                  onClick={() => setSelected(lead)}
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && setSelected(lead)}
+                  className="border-t border-line cursor-pointer hover:bg-surface2 transition-colors"
+                >
+                  <td className="py-3 px-5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-surface2 border border-line grid place-items-center text-[11px] font-semibold text-ink2 shrink-0">
+                        {initials(lead.name)}
+                      </div>
+                      <span className="font-medium text-[13.5px]">{lead.name || 'Sem nome'}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-3">
+                    <ChannelBadge channel={lead.channel} />
+                  </td>
+                  <td className="py-3 px-3 text-[13px] text-ink2">{lead.vehicleInterest || 'A confirmar'}</td>
+                  <td className="py-3 px-3 text-[13px] text-ink2 tnum">{lead.phone || '—'}</td>
+                  <td className="py-3 px-3">
+                    <StageBadge stage={lead.stage} />
+                  </td>
+                  <td className="py-3 px-5 text-[13px] text-ink3 tnum text-right">
+                    {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('pt-BR') : '—'}
+                  </td>
+                </motion.tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : leads.length === 0 ? (
+        <EmptyState
+          icon={Users2}
+          title="Nenhum lead por aqui ainda"
+          description="Assim que alguém mandar a primeira mensagem pra Vitória, o lead entra nessa lista automaticamente."
+        />
+      ) : (
+        <EmptyState
+          icon={SearchX}
+          title="Nada bateu com esse filtro"
+          description="Tente outro estágio ou limpe a busca lá em cima."
+        />
+      )}
+
       <LeadModal
         lead={selected}
         onClose={() => setSelected(null)}
@@ -69,6 +128,6 @@ export default function Leads({ leads, search, onMoveStage }) {
           setSelected(null)
         }}
       />
-    </div>
+    </section>
   )
 }
