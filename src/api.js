@@ -1,3 +1,5 @@
+import { getToken, limparSessao } from './auth'
+
 const STORAGE_KEY = 'vtcar_api_base'
 
 // Padrao usado quando ninguem configurou nada ainda — assim o CRM ja abre
@@ -19,16 +21,37 @@ export function setApiBase(url) {
   localStorage.setItem(STORAGE_KEY, clean)
 }
 
+// Quando a sessao cai, avisamos o App pra voltar pra tela de login em vez
+// de deixar a pessoa olhando telas vazias sem entender o motivo.
+let aoPerderSessao = () => {}
+export function definirAoPerderSessao(fn) {
+  aoPerderSessao = typeof fn === 'function' ? fn : () => {}
+}
+
 async function request(path, options = {}) {
   const base = getApiBase()
   if (!base) throw new Error('Backend nao configurado')
+
+  const token = getToken()
   const res = await fetch(base + path, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
   })
+
+  if (res.status === 401 && !path.startsWith('/api/auth/')) {
+    limparSessao()
+    aoPerderSessao()
+    throw new Error('Sessão expirada. Entre novamente.')
+  }
+
   if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`HTTP ${res.status} ${text}`)
+    // O backend manda { error: "mensagem" }; preferimos ela ao "HTTP 400" cru.
+    const corpo = await res.json().catch(() => null)
+    throw new Error(corpo?.error || `HTTP ${res.status}`)
   }
   if (res.status === 204) return null
   return res.json()
@@ -62,4 +85,56 @@ export function getLeadCoach(id) {
 
 export function regenerateLeadCoach(id) {
   return request(`/api/leads/${id}/coach`, { method: 'POST' })
+}
+
+/* ---------- autenticação ---------- */
+
+export function precisaConfigurar() {
+  return request('/api/auth/precisa-configurar')
+}
+
+export function primeiroAcesso(dados) {
+  return request('/api/auth/primeiro-acesso', { method: 'POST', body: JSON.stringify(dados) })
+}
+
+export function login(email, senha) {
+  return request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }) })
+}
+
+export function meuUsuario() {
+  return request('/api/auth/eu')
+}
+
+export function trocarSenha(senhaAtual, novaSenha) {
+  return request('/api/auth/trocar-senha', { method: 'POST', body: JSON.stringify({ senhaAtual, novaSenha }) })
+}
+
+export function esqueciSenha(email) {
+  return request('/api/auth/esqueci-senha', { method: 'POST', body: JSON.stringify({ email }) })
+}
+
+export function redefinirSenha(token, novaSenha) {
+  return request('/api/auth/redefinir-senha', { method: 'POST', body: JSON.stringify({ token, novaSenha }) })
+}
+
+/* ---------- usuários (só gerente) ---------- */
+
+export function listarUsuarios() {
+  return request('/api/usuarios')
+}
+
+export function criarUsuario(dados) {
+  return request('/api/usuarios', { method: 'POST', body: JSON.stringify(dados) })
+}
+
+export function atualizarUsuario(id, campos) {
+  return request(`/api/usuarios/${id}`, { method: 'PATCH', body: JSON.stringify(campos) })
+}
+
+export function removerUsuario(id) {
+  return request(`/api/usuarios/${id}`, { method: 'DELETE' })
+}
+
+export function reenviarSenha(id) {
+  return request(`/api/usuarios/${id}/reenviar-senha`, { method: 'POST' })
 }

@@ -8,7 +8,11 @@ import Dashboard from './pages/Dashboard'
 import Leads from './pages/Leads'
 import Pipeline from './pages/Pipeline'
 import Contatos from './pages/Contatos'
-import { getApiBase, setApiBase, getLeads, updateLeadStage } from './api'
+import Usuarios from './pages/Usuarios'
+import Login from './pages/Login'
+import TrocarSenha from './pages/TrocarSenha'
+import { getToken, getUsuario, limparSessao, salvarSessao } from './auth'
+import { getApiBase, setApiBase, getLeads, updateLeadStage, meuUsuario, definirAoPerderSessao } from './api'
 
 // Chave nova de proposito. A anterior ("vtcar_theme") era gravada na montagem,
 // entao quem so abriu o CRM enquanto o escuro era padrao ficou com "dark"
@@ -21,6 +25,7 @@ const PAGES = {
   pipeline: { title: 'Pipeline de vendas', subtitle: 'Arraste o lead pelo funil' },
   leads: { title: 'Leads', subtitle: 'Todo mundo que a Vitória captou' },
   contatos: { title: 'Contatos do WhatsApp', subtitle: 'Direto do GPT Maker, desde o primeiro atendimento' },
+  usuarios: { title: 'Usuários', subtitle: 'Quem tem acesso ao CRM' },
   clientes: {
     title: 'Clientes',
     subtitle: 'Quem já comprou',
@@ -77,6 +82,8 @@ function usePersistedTheme() {
 }
 
 export default function App() {
+  const [usuario, setUsuario] = useState(() => (getToken() ? getUsuario() : null))
+  const [validandoSessao, setValidandoSessao] = useState(() => Boolean(getToken()))
   const [page, setPage] = useState('dashboard')
   const [leads, setLeads] = useState([])
   const [search, setSearch] = useState('')
@@ -85,8 +92,45 @@ export default function App() {
   const [moveError, setMoveError] = useState(null)
   const [theme, toggleTheme] = usePersistedTheme()
 
+  const sair = useCallback(() => {
+    limparSessao()
+    setUsuario(null)
+    setLeads([])
+    setPage('dashboard')
+  }, [])
+
+  // Qualquer 401 vindo da API derruba a sessao e volta pro login.
+  useEffect(() => {
+    definirAoPerderSessao(() => setUsuario(null))
+  }, [])
+
+  // Ao abrir, confere com o servidor se o token guardado ainda vale. Sem
+  // isso, a pessoa veria o CRM montar e so depois cair pra tela de login.
+  useEffect(() => {
+    if (!getToken()) return
+    let cancelado = false
+    meuUsuario()
+      .then((r) => {
+        if (cancelado) return
+        salvarSessao(null, r.usuario)
+        setUsuario(r.usuario)
+      })
+      .catch(() => {
+        if (!cancelado) {
+          limparSessao()
+          setUsuario(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelado) setValidandoSessao(false)
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [])
+
   const refreshLeads = useCallback(async () => {
-    if (!getApiBase()) return
+    if (!getApiBase() || !getToken()) return
     try {
       const data = await getLeads()
       setLeads(Array.isArray(data) ? data : [])
@@ -98,10 +142,11 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (!usuario || usuario.precisaTrocarSenha) return
     refreshLeads()
     const interval = setInterval(refreshLeads, 30000)
     return () => clearInterval(interval)
-  }, [refreshLeads])
+  }, [refreshLeads, usuario])
 
   // Move otimista: o card muda de coluna na hora e so depois confirma com a
   // API. Se o backend recusar, volta pro estado anterior e avisa.
@@ -123,9 +168,34 @@ export default function App() {
   const pipelineCount = leads.filter((l) => ['novo', 'qualificado', 'proposta', 'negociacao'].includes(l.stage)).length
   const meta = PAGES[page]
 
+  // Tela em branco enquanto confirmamos o token, pra nao piscar o login
+  // pra quem ja esta logado.
+  if (validandoSessao) {
+    return <div className="min-h-screen bg-plane" />
+  }
+
+  if (!usuario) {
+    return <Login onEntrou={(u) => { setUsuario(u); setValidandoSessao(false) }} />
+  }
+
+  if (usuario.precisaTrocarSenha) {
+    return <TrocarSenha usuario={usuario} onPronto={setUsuario} onSair={sair} />
+  }
+
+  // Vendedor nao acessa a area de usuarios nem digitando a rota na mao.
+  const podeVer = page !== 'usuarios' || usuario.papel === 'gerente'
+  const paginaAtual = podeVer ? page : 'dashboard'
+
   return (
     <div className="flex min-h-screen bg-plane">
-      <Sidebar page={page} onNavigate={setPage} leadsCount={leadsCount} pipelineCount={pipelineCount} />
+      <Sidebar
+        page={paginaAtual}
+        onNavigate={setPage}
+        leadsCount={leadsCount}
+        pipelineCount={pipelineCount}
+        usuario={usuario}
+        onSair={sair}
+      />
 
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar
@@ -145,6 +215,7 @@ export default function App() {
           {page === 'leads' && <Leads leads={leads} search={search} onMoveStage={handleMoveStage} />}
           {page === 'pipeline' && <Pipeline leads={leads} search={search} onMoveStage={handleMoveStage} />}
           {page === 'contatos' && <Contatos search={search} />}
+          {paginaAtual === 'usuarios' && <Usuarios usuarioAtual={usuario} />}
           {meta.soon && (
             <div className="bg-surface border border-line rounded-card shadow-card">
               <EmptyState
