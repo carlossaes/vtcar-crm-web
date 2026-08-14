@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, MessagesSquare, RefreshCw, SearchX, TriangleAlert } from 'lucide-react'
+import { Download, DownloadCloud, Loader2, MessagesSquare, RefreshCw, SearchX, TriangleAlert } from 'lucide-react'
 import EmptyState from '../components/EmptyState'
-import { getGptmakerChats, getLeads } from '../api'
+import { getGptmakerChats, getLeads, importarAntigos } from '../api'
 import { displayName, formatPhone, hasName } from '../format'
 
 // Tipo de canal do GPT Maker -> rotulo que a equipe entende.
@@ -37,12 +37,14 @@ const fmtData = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-dig
 
 const soDigitos = (v) => String(v || '').replace(/\D/g, '')
 
-export default function Contatos({ search }) {
+export default function Contatos({ search, usuario }) {
   const [linhas, setLinhas] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
   const [ordem, setOrdem] = useState({ col: 'data', dir: 'desc' })
   const [filtro, setFiltro] = useState('todos')
+  const [importando, setImportando] = useState(false)
+  const [resultadoImport, setResultadoImport] = useState(null)
 
   const carregar = async () => {
     setCarregando(true)
@@ -118,6 +120,39 @@ export default function Contatos({ search }) {
     })
   }, [linhas, filtro, search, ordem])
 
+  // Importar e seguro repetir: quem ja esta no CRM e ignorado. Mesmo assim
+  // rodamos o ensaio antes e mostramos o numero exato pra confirmacao.
+  const importar = async () => {
+    setImportando(true)
+    setErro(null)
+    setResultadoImport(null)
+    try {
+      const ensaio = await importarAntigos(true)
+      if (ensaio.importados === 0) {
+        setResultadoImport('Nada a importar — todos os contatos já estão no CRM.')
+        return
+      }
+      const de = ensaio.periodoImportado?.do ? fmtData.format(new Date(ensaio.periodoImportado.do)) : '—'
+      const ate = ensaio.periodoImportado?.ate ? fmtData.format(new Date(ensaio.periodoImportado.ate)) : '—'
+      const semTelefone = ensaio.ignorados?.length
+        ? `\n\n${ensaio.ignorados.length} contato(s) ficam de fora por não ter telefone.`
+        : ''
+      const confirma = window.confirm(
+        `Importar ${ensaio.importados} contatos para o CRM?\n\nSão conversas de ${de} a ${ate}. ` +
+        `Todos entram como "Novo", com a data original preservada.${semTelefone}`
+      )
+      if (!confirma) return
+
+      const r = await importarAntigos(false)
+      setResultadoImport(`${r.importados} contatos importados. O CRM agora tem ${r.totalNoCrmDepois} leads.`)
+      carregar()
+    } catch (err) {
+      setErro(err.message)
+    } finally {
+      setImportando(false)
+    }
+  }
+
   const ordenarPor = (col) => {
     setOrdem((o) => (o.col === col ? { col, dir: o.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: col === 'data' ? 'desc' : 'asc' }))
   }
@@ -155,10 +190,21 @@ export default function Contatos({ search }) {
               <b className="text-ink">{fora}</b> destes contatos não estão no CRM: são anteriores a{' '}
               {primeiroNoCrm ? fmtData.format(primeiroNoCrm) : '—'}, quando a integração passou a gravar
               automaticamente. Use o filtro “Fora do CRM” para vê-los.
+              {usuario?.papel === 'gerente' && (
+                <button
+                  onClick={importar}
+                  disabled={importando}
+                  className="ml-2 inline-flex items-center gap-1.5 border border-line rounded-control px-2.5 h-7 text-[12px] font-medium text-ink2 hover:text-ink hover:border-lineStrong transition-colors disabled:opacity-50 align-middle"
+                >
+                  {importando ? <Loader2 size={12} className="animate-spin" /> : <DownloadCloud size={12} />}
+                  Trazer para o CRM
+                </button>
+              )}
             </>
           ) : (
             'Todos já estão no CRM.'
           )}
+          {resultadoImport && <div className="mt-2 text-ink font-medium">{resultadoImport}</div>}
         </div>
       )}
 
