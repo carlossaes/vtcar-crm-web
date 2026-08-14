@@ -1,4 +1,4 @@
-import { LayoutGrid, GitBranch, Users2, UserCircle, Car, Activity, BarChart3, MessagesSquare } from 'lucide-react'
+import { LayoutGrid, GitBranch, Users2, UserCircle, Car, Activity, BarChart3, MessagesSquare, ShieldCheck, LogOut } from 'lucide-react'
 
 const NAV_SECTIONS = [
   { title: 'Principal', items: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutGrid }] },
@@ -17,11 +17,23 @@ const NAV_SECTIONS = [
     items: [
       { id: 'atividades', label: 'Atividades', icon: Activity },
       { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
+      // Só aparece para gerente — quem administra quem tem acesso.
+      { id: 'usuarios', label: 'Usuários', icon: ShieldCheck, soGerente: true },
     ],
   },
 ]
 
-export default function Sidebar({ page, onNavigate, leadsCount, pipelineCount }) {
+function iniciais(nome) {
+  return String(nome || '?')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase()
+}
+
+export default function Sidebar({ page, onNavigate, leadsCount, pipelineCount, usuario, onSair }) {
   return (
     <aside className="w-[228px] shrink-0 bg-surface border-r border-line flex flex-col h-screen sticky top-0">
       <div className="px-5 h-16 flex items-center gap-3 border-b border-line">
@@ -39,7 +51,9 @@ export default function Sidebar({ page, onNavigate, leadsCount, pipelineCount })
           <div key={section.title}>
             <div className="px-2.5 pb-1.5 text-micro uppercase font-semibold text-ink3">{section.title}</div>
             <div className="flex flex-col gap-0.5">
-              {section.items.map((item) => {
+              {section.items
+              .filter((item) => !item.soGerente || usuario?.papel === 'gerente')
+              .map((item) => {
                 const Icon = item.icon
                 const active = page === item.id
                 const badge = item.id === 'leads' ? leadsCount : item.id === 'pipeline' ? pipelineCount : null
@@ -74,14 +88,22 @@ export default function Sidebar({ page, onNavigate, leadsCount, pipelineCount })
       </nav>
 
       <div className="p-3 border-t border-line">
-        <div className="flex items-center gap-2.5 rounded-control px-2 py-2 hover:bg-surface2 transition-colors">
-          <div className="w-8 h-8 rounded-full bg-surface3 border border-line grid place-items-center font-semibold text-[12px] text-ink2">
-            CS
+        <div className="flex items-center gap-2.5 rounded-control px-2 py-2">
+          <div className="w-8 h-8 rounded-full bg-surface3 border border-line grid place-items-center font-semibold text-[12px] text-ink2 shrink-0">
+            {iniciais(usuario?.nome)}
           </div>
-          <div className="min-w-0">
-            <div className="text-[13px] font-semibold truncate">Carlos Sales</div>
-            <div className="text-[11px] text-ink3">Gerente</div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold truncate">{usuario?.nome || '—'}</div>
+            <div className="text-[11px] text-ink3 capitalize">{usuario?.papel || ''}</div>
           </div>
+          <button
+            onClick={onSair}
+            title="Sair"
+            aria-label="Sair"
+            className="grid place-items-center w-8 h-8 rounded-control text-ink3 hover:text-ink hover:bg-surface2 transition-colors shrink-0"
+          >
+            <LogOut size={15} />
+          </button>
         </div>
       </div>
     </aside>
