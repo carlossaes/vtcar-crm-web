@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contatos VT Car — WhatsApp (GPT Maker)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --plane: 246 247 249;
+    --surface: 255 255 255;
+    --surface-2: 241 243 246;
+    --line: 227 231 237;
+    --line-strong: 203 210 220;
+    --ink: 14 17 22;
+    --ink-2: 90 100 114;
+    --ink-3: 128 138 152;
+    --brand: 200 30 44;
+    --good: 0 99 0;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: rgb(var(--plane));
+    color: rgb(var(--ink));
+    font-family: Inter, ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  header.topo {
+    background: rgb(var(--surface));
+    border-bottom: 1px solid rgb(var(--line));
+    padding: 18px 24px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .titulo { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 34px; height: 34px; border-radius: 9px; background: rgb(var(--brand));
+    color: #fff; font-weight: 800; font-size: 13px;
+    display: grid; place-items: center; letter-spacing: -.02em;
+  }
+  h1 { font-size: 17px; margin: 0; letter-spacing: -.02em; }
+  .sub { font-size: 12.5px; color: rgb(var(--ink-3)); margin-top: 1px; }
+
+  .barra {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    margin-top: 16px;
+  }
+  .busca {
+    display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px; max-width: 420px;
+    background: rgb(var(--surface-2)); border: 1px solid rgb(var(--line));
+    border-radius: 10px; padding: 0 12px; height: 38px;
+  }
+  .busca:focus-within { border-color: rgb(var(--line-strong)); }
+  .busca input {
+    border: 0; background: transparent; outline: none; flex: 1; min-width: 0;
+    font-size: 13.5px; font-family: inherit; color: inherit;
+  }
+  .busca svg { flex: none; color: rgb(var(--ink-3)); }
+  .contagem { font-size: 12.5px; color: rgb(var(--ink-2)); }
+  button.acao {
+    height: 38px; padding: 0 14px; border-radius: 10px; cursor: pointer;
+    border: 1px solid rgb(var(--line)); background: rgb(var(--surface));
+    font: 600 13px Inter, sans-serif; color: rgb(var(--ink-2));
+  }
+  button.acao:hover { color: rgb(var(--ink)); border-color: rgb(var(--line-strong)); }
+
+  main { padding: 20px 24px 40px; }
+  .cartao {
+    background: rgb(var(--surface)); border: 1px solid rgb(var(--line));
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .05);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+    color: rgb(var(--ink-3)); font-weight: 600;
+    background: rgb(var(--surface-2)); padding: 10px 16px;
+    cursor: pointer; user-select: none; white-space: nowrap;
+    position: sticky; top: 0;
+  }
+  thead th:hover { color: rgb(var(--ink-2)); }
+  thead th .seta { opacity: .35; margin-left: 4px; }
+  thead th[aria-sort] .seta { opacity: 1; color: rgb(var(--brand)); }
+  tbody td { padding: 11px 16px; font-size: 13.5px; border-top: 1px solid rgb(var(--line)); }
+  tbody tr:hover { background: rgb(var(--surface-2)); }
+  .semnome { color: rgb(var(--ink-3)); }
+  .pill {
+    display: inline-block; border: 1px solid rgb(var(--line)); background: rgb(var(--surface-2));
+    border-radius: 999px; padding: 2px 9px; font-size: 11.5px; color: rgb(var(--ink-2));
+    white-space: nowrap;
+  }
+  .pill.fora { border-color: rgb(var(--brand) / .35); background: rgb(var(--brand) / .07); color: rgb(var(--brand)); }
+  .vazio { padding: 48px 16px; text-align: center; color: rgb(var(--ink-2)); font-size: 13.5px; }
+  .aviso {
+    margin: 0 0 14px; padding: 11px 14px; border-radius: 10px; font-size: 12.5px; line-height: 1.5;
+    background: rgb(var(--surface)); border: 1px solid rgb(var(--line)); color: rgb(var(--ink-2));
+  }
+  .aviso b { color: rgb(var(--ink)); }
+  .erro { border-color: rgb(var(--brand) / .4); }
+</style>
+</head>
+<body>
+<header class="topo">
+  <div class="titulo">
+    <div class="logo">VT</div>
+    <div>
+      <h1>Contatos do WhatsApp</h1>
+      <div class="sub" id="periodo">carregando…</div>
+    </div>
+  </div>
+  <div class="barra">
+    <label class="busca">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Buscar por nome, telefone ou data…" autocomplete="off" />
+    </label>
+    <span class="contagem" id="contagem"></span>
+    <button class="acao" id="csv">Baixar CSV</button>
+    <button class="acao" id="recarregar">Atualizar</button>
+  </div>
+</header>
+
+<main>
+  <div class="aviso" id="cobertura"></div>
+  <div class="cartao">
+    <table>
+      <thead>
+        <tr>
+          <th data-col="nome">Nome <span class="seta">↕</span></th>
+          <th data-col="telefone">Celular <span class="seta">↕</span></th>
+          <th data-col="data">Primeiro contato <span class="seta">↕</span></th>
+          <th data-col="canal">Canal <span class="seta">↕</span></th>
+          <th data-col="noCrm">No CRM <span class="seta">↕</span></th>
+        </tr>
+      </thead>
+      <tbody id="corpo"></tbody>
+    </table>
+    <div class="vazio" id="vazio" hidden></div>
+  </div>
+</main>
+
+<script>
+const API = 'https://vtcar-gptmaker-integration-production.up.railway.app'
+
+/* ---- mesmas regras de exibicao do CRM ---- */
+function formatPhone(raw) {
+  if (!raw) return ''
+  const d = String(raw).replace(/\D/g, '')
+  const mont = (ddd, n) => `(${ddd}) ${n.length === 9 ? n.slice(0,5) : n.slice(0,4)}-${n.length === 9 ? n.slice(5) : n.slice(4)}`
+  if ((d.length === 13 || d.length === 12) && d.startsWith('55')) return mont(d.slice(2,4), d.slice(4))
+  if (d.length === 11 || d.length === 10) return mont(d.slice(0,2), d.slice(2))
+  return String(raw)
+}
+function limparNome(n) {
+  return String(n || '').replace(/[^\p{L}\p{M}\s'.-]/gu, '').replace(/\s+/g, ' ').trim()
+}
+function nomeExibido(l) {
+  const limpo = limparNome(l.name)
+  const letras = (limpo.match(/\p{L}/gu) || []).length
+  if (letras >= 2) {
+    return limpo.split(' ').map(p => (p && p === p.toLowerCase() ? p[0].toUpperCase() + p.slice(1) : p)).join(' ')
+  }
+  return ''
+}
+const ESTAGIOS = { novo:'Novo', qualificado:'Qualificado', proposta:'Proposta', negociacao:'Negociação', fechado:'Fechado', perdido:'Perdido' }
+
+/* ---- estado ---- */
+let dados = []
+let ordem = { col: 'data', dir: 'desc' }
+let termo = ''
+
+const fmtData = new Intl.DateTimeFormat('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+
+const CANAIS = { WHATSAPP:'WhatsApp', Z_API:'WhatsApp', CLOUD_API:'WhatsApp', INSTAGRAM:'Instagram', MESSENGER:'Facebook', WIDGET:'Site', TELEGRAM:'Telegram', MERCADO_LIVRE:'Mercado Livre' }
+
+async function carregar() {
+  const cob = document.getElementById('cobertura')
+  cob.className = 'aviso'
+  cob.textContent = 'Carregando os contatos…'
+  try {
+    // A fonte da verdade e o GPT Maker: e la que esta TODO mundo que falou
+    // com o WhatsApp. O CRM entra so pra marcar quem virou lead.
+    const [gpt, leads] = await Promise.all([
+      fetch(API + '/api/gptmaker/chats').then(r => { if (!r.ok) throw new Error('GPT Maker HTTP ' + r.status); return r.json() }),
+      fetch(API + '/api/leads').then(r => r.ok ? r.json() : []).catch(() => []),
+    ])
+
+    const fonesCrm = new Set(leads.map(l => String(l.phone || '').replace(/\D/g, '')).filter(Boolean))
+
+    dados = gpt.chats.map(c => {
+      const cru = String(c.phone || '').replace(/\D/g, '')
+      return {
+        nome: nomeExibido({ name: c.name }),
+        telefone: formatPhone(c.phone),
+        telefoneCru: cru,
+        data: c.createdAt ? new Date(c.createdAt) : null,
+        canal: CANAIS[c.channelType] || c.channelType || '—',
+        noCrm: cru && fonesCrm.has(cru) ? 'Sim' : 'Não',
+      }
+    })
+
+    const datas = dados.map(d => d.data).filter(Boolean).sort((a,b) => a-b)
+    const f = new Intl.DateTimeFormat('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' })
+    const fora = dados.filter(d => d.noCrm === 'Não').length
+    document.getElementById('periodo').textContent =
+      datas.length ? `${dados.length} contatos · de ${f.format(datas[0])} a ${f.format(datas[datas.length-1])}` : 'sem contatos'
+    cob.innerHTML = datas.length
+      ? `<b>Todo mundo que já falou com o WhatsApp da VT Car</b>, direto do GPT Maker — desde ${f.format(datas[0])}.
+         ${fora > 0 ? `<b>${fora}</b> destes contatos não estão no CRM: são anteriores a ${f.format(new Date(Math.min(...dados.filter(d=>d.noCrm==='Sim').map(d=>d.data))))}, quando a integração passou a gravar automaticamente. Filtre a coluna “No CRM” para vê-los.` : 'Todos já estão no CRM.'}`
+      : 'Nenhum contato registrado.'
+    render()
+  } catch (e) {
+    cob.className = 'aviso erro'
+    cob.innerHTML = `<b>Não consegui carregar.</b> ${e.message}. O servidor pode estar iniciando — clique em “Atualizar” em alguns segundos.`
+    dados = []
+    render()
+  }
+}
+
+function valorOrdem(linha, col) {
+  if (col === 'data') return linha.data ? linha.data.getTime() : 0
+  if (col === 'telefone') return linha.telefoneCru
+  if (col === 'nome') return (linha.nome || 'zzzz').toLowerCase() // sem nome vai pro fim
+  return String(linha[col] || '').toLowerCase()
+}
+
+function render() {
+  const q = termo.trim().toLowerCase()
+  let linhas = dados
+  if (q) {
+    const soDigitos = q.replace(/\D/g, '')
+    linhas = dados.filter(l =>
+      (l.nome || '').toLowerCase().includes(q) ||
+      l.telefone.toLowerCase().includes(q) ||
+      (soDigitos && l.telefoneCru.includes(soDigitos)) ||
+      (l.data ? fmtData.format(l.data).includes(q) : false) ||
+      l.canal.toLowerCase().includes(q) ||
+      l.noCrm.toLowerCase().includes(q)
+    )
+  }
+
+  linhas = [...linhas].sort((a, b) => {
+    const va = valorOrdem(a, ordem.col), vb = valorOrdem(b, ordem.col)
+    const r = va < vb ? -1 : va > vb ? 1 : 0
+    return ordem.dir === 'asc' ? r : -r
+  })
+
+  document.querySelectorAll('thead th').forEach(th => {
+    const ativo = th.dataset.col === ordem.col
+    if (ativo) th.setAttribute('aria-sort', ordem.dir === 'asc' ? 'ascending' : 'descending')
+    else th.removeAttribute('aria-sort')
+    th.querySelector('.seta').textContent = ativo ? (ordem.dir === 'asc' ? '↑' : '↓') : '↕'
+  })
+
+  const corpo = document.getElementById('corpo')
+  corpo.innerHTML = linhas.map(l => `
+    <tr>
+      <td>${l.nome ? escapar(l.nome) : '<span class="semnome">sem nome no perfil</span>'}</td>
+      <td class="tnum">${escapar(l.telefone)}</td>
+      <td class="tnum">${l.data ? fmtData.format(l.data) : '—'}</td>
+      <td><span class="pill">${escapar(l.canal)}</span></td>
+      <td><span class="pill ${l.noCrm === 'Não' ? 'fora' : ''}">${escapar(l.noCrm)}</span></td>
+    </tr>`).join('')
+
+  const vazio = document.getElementById('vazio')
+  vazio.hidden = linhas.length > 0
+  vazio.textContent = dados.length === 0 ? 'Nada carregado ainda.' : 'Nenhum contato bate com essa busca.'
+
+  document.getElementById('contagem').textContent =
+    q ? `${linhas.length} de ${dados.length}` : `${dados.length} contatos`
+}
+
+function escapar(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]))
+}
+
+/* ---- eventos ---- */
+document.querySelectorAll('thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col
+    if (ordem.col === col) ordem.dir = ordem.dir === 'asc' ? 'desc' : 'asc'
+    else ordem = { col, dir: col === 'data' ? 'desc' : 'asc' }
+    render()
+  })
+})
+document.getElementById('q').addEventListener('input', e => { termo = e.target.value; render() })
+document.getElementById('recarregar').addEventListener('click', carregar)
+document.getElementById('csv').addEventListener('click', () => {
+  const linhas = [['Nome','Celular','Primeiro contato','Canal','No CRM']]
+  const q = termo.trim().toLowerCase()
+  const visiveis = [...document.querySelectorAll('#corpo tr')]
+  visiveis.forEach(tr => {
+    const c = [...tr.children].map(td => td.innerText.trim())
+    linhas.push(c)
+  })
+  // ponto-e-virgula: e o separador que o Excel em portugues entende
+  const csv = '﻿' + linhas.map(l => l.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n')
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  a.download = 'contatos-vtcar.csv'
+  a.click()
+  URL.revokeObjectURL(a.href)
+})
+
+carregar()
+</script>
+</body>
+</html>
