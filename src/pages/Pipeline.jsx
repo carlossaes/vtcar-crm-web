@@ -2,21 +2,11 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GripVertical, Inbox } from 'lucide-react'
 import { ChannelBadge, STAGE_META } from '../components/Badge'
-import { displayName, formatPhone } from '../format'
+import { displayName, formatPhone, quandoEntrou } from '../format'
 import LeadModal from '../components/LeadModal'
 
 // O funil inteiro, incluindo as duas saidas (fechado e perdido).
 const COLUMNS = ['novo', 'qualificado', 'proposta', 'negociacao', 'fechado', 'perdido']
-
-function relativeDay(iso) {
-  if (!iso) return '—'
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
-  if (days <= 0) return 'hoje'
-  if (days === 1) return 'ontem'
-  if (days < 30) return `há ${days} dias`
-  const months = Math.floor(days / 30)
-  return `há ${months} ${months === 1 ? 'mês' : 'meses'}`
-}
 
 function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, onDragEnd }) {
   return (
@@ -58,7 +48,7 @@ function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, onDragE
       </div>
       <div className="flex items-center justify-between gap-2 mt-2.5">
         <ChannelBadge channel={lead.channel} />
-        <span className="text-[11.5px] text-ink3 tnum shrink-0">{relativeDay(lead.createdAt)}</span>
+        <span className="text-[11.5px] text-ink3 tnum shrink-0">{quandoEntrou(lead.createdAt)}</span>
       </div>
     </motion.article>
   )
