@@ -93,6 +93,26 @@ export function precisaConfigurar() {
   return request('/api/auth/precisa-configurar')
 }
 
+export function conferirConvite(token) {
+  return request(`/api/auth/convite/${encodeURIComponent(token)}`)
+}
+
+export function aceitarConvite(dados) {
+  return request('/api/auth/aceitar-convite', { method: 'POST', body: JSON.stringify(dados) })
+}
+
+export function listarConvites() {
+  return request('/api/usuarios/convites')
+}
+
+export function criarConvite(dados) {
+  return request('/api/usuarios/convites', { method: 'POST', body: JSON.stringify(dados) })
+}
+
+export function revogarConvite(id) {
+  return request(`/api/usuarios/convites/${id}`, { method: 'DELETE' })
+}
+
 export function primeiroAcesso(dados) {
   return request('/api/auth/primeiro-acesso', { method: 'POST', body: JSON.stringify(dados) })
 }
