@@ -1,4 +1,4 @@
-import { LayoutGrid, GitBranch, Users2, UserCircle, Car, Activity, BarChart3 } from 'lucide-react'
+import { LayoutGrid, GitBranch, Users2, UserCircle, Car, Activity, BarChart3, MessagesSquare } from 'lucide-react'
 
 const NAV_SECTIONS = [
   { title: 'Principal', items: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutGrid }] },
@@ -7,6 +7,7 @@ const NAV_SECTIONS = [
     items: [
       { id: 'pipeline', label: 'Pipeline', icon: GitBranch },
       { id: 'leads', label: 'Leads', icon: Users2 },
+      { id: 'contatos', label: 'Contatos', icon: MessagesSquare },
       { id: 'clientes', label: 'Clientes', icon: UserCircle },
     ],
   },
