@@ -52,6 +52,10 @@ export default function Contatos({ search }) {
       // o WhatsApp. Os leads entram so pra marcar quem virou registro no CRM.
       const [gpt, leads] = await Promise.all([getGptmakerChats(), getLeads().catch(() => [])])
       const fonesNoCrm = new Set((leads || []).map((l) => soDigitos(l.phone)).filter(Boolean))
+      // Casar so por telefone nao basta: contato que chega no formato "@lid"
+      // do WhatsApp entra no CRM com o identificador no lugar do numero, e o
+      // telefone nunca bate. O id do chat resolve esses casos.
+      const chatIdsNoCrm = new Set((leads || []).map((l) => l.gptmakerChatId).filter(Boolean))
 
       setLinhas(
         (gpt.chats || []).map((c) => {
@@ -64,7 +68,7 @@ export default function Contatos({ search }) {
             telefoneCru: cru,
             data: c.createdAt ? new Date(c.createdAt) : null,
             canal: CANAIS[c.channelType] || c.channelType || '—',
-            noCrm: cru && fonesNoCrm.has(cru),
+            noCrm: (cru && fonesNoCrm.has(cru)) || (c.id && chatIdsNoCrm.has(c.id)),
           }
         })
       )
@@ -161,7 +165,8 @@ export default function Contatos({ search }) {
       <section className="bg-surface border border-line rounded-card shadow-card overflow-hidden">
         <header className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-line">
           <h2 className="text-[13.5px] font-semibold mr-auto">
-            Contatos <span className="text-ink3 font-normal tnum">({filtradas.length})</span>
+            Contatos{' '}
+            <span className="text-ink3 font-normal tnum">{carregando ? '' : `(${filtradas.length})`}</span>
           </h2>
 
           <div className="flex items-center gap-1 bg-surface2 border border-line rounded-control p-0.5">
