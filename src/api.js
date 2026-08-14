@@ -38,6 +38,12 @@ export function getLeads() {
   return request('/api/leads')
 }
 
+// Todos os atendimentos do GPT Maker, inclusive os anteriores ao webhook.
+// Quem fala com a API do GPT Maker e o backend — o token fica so la.
+export function getGptmakerChats() {
+  return request('/api/gptmaker/chats')
+}
+
 export function createLead(data) {
   return request('/api/leads', { method: 'POST', body: JSON.stringify(data) })
 }

@@ -7,6 +7,7 @@ import EmptyState from './components/EmptyState'
 import Dashboard from './pages/Dashboard'
 import Leads from './pages/Leads'
 import Pipeline from './pages/Pipeline'
+import Contatos from './pages/Contatos'
 import { getApiBase, setApiBase, getLeads, updateLeadStage } from './api'
 
 // Chave nova de proposito. A anterior ("vtcar_theme") era gravada na montagem,
@@ -19,6 +20,7 @@ const PAGES = {
   dashboard: { title: 'Dashboard', subtitle: 'Visão geral da operação' },
   pipeline: { title: 'Pipeline de vendas', subtitle: 'Arraste o lead pelo funil' },
   leads: { title: 'Leads', subtitle: 'Todo mundo que a Vitória captou' },
+  contatos: { title: 'Contatos do WhatsApp', subtitle: 'Direto do GPT Maker, desde o primeiro atendimento' },
   clientes: {
     title: 'Clientes',
     subtitle: 'Quem já comprou',
@@ -142,6 +144,7 @@ export default function App() {
           {page === 'dashboard' && <Dashboard leads={leads} onGoToLeads={() => setPage('leads')} />}
           {page === 'leads' && <Leads leads={leads} search={search} onMoveStage={handleMoveStage} />}
           {page === 'pipeline' && <Pipeline leads={leads} search={search} onMoveStage={handleMoveStage} />}
+          {page === 'contatos' && <Contatos search={search} />}
           {meta.soon && (
             <div className="bg-surface border border-line rounded-card shadow-card">
               <EmptyState
