@@ -67,6 +67,12 @@ export function getGptmakerChats() {
   return request('/api/gptmaker/chats')
 }
 
+// Traz pro CRM os contatos que existem no GPT Maker e nunca viraram lead.
+// Com ensaio = true nada e gravado; serve pra conferir antes.
+export function importarAntigos(ensaio = false) {
+  return request(`/api/gptmaker/importar-antigos${ensaio ? '?dryRun=1' : ''}`, { method: 'POST' })
+}
+
 export function createLead(data) {
   return request('/api/leads', { method: 'POST', body: JSON.stringify(data) })
 }

@@ -214,7 +214,7 @@ export default function App() {
           {page === 'dashboard' && <Dashboard leads={leads} onGoToLeads={() => setPage('leads')} />}
           {page === 'leads' && <Leads leads={leads} search={search} onMoveStage={handleMoveStage} />}
           {page === 'pipeline' && <Pipeline leads={leads} search={search} onMoveStage={handleMoveStage} />}
-          {page === 'contatos' && <Contatos search={search} />}
+          {page === 'contatos' && <Contatos search={search} usuario={usuario} />}
           {paginaAtual === 'usuarios' && <Usuarios usuarioAtual={usuario} />}
           {meta.soon && (
             <div className="bg-surface border border-line rounded-card shadow-card">
