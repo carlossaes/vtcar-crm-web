@@ -56,6 +56,36 @@ export function displayName(lead) {
   return formatPhone(lead.phone) || 'Sem nome'
 }
 
+// Quantos DIAS DE CALENDARIO separam duas datas. Comparar por 24h nao serve:
+// ontem as 20h faz 13 horas, mas continua sendo ontem pra quem le a tela.
+function diasDeCalendario(de, ate) {
+  const a = new Date(de.getFullYear(), de.getMonth(), de.getDate())
+  const b = new Date(ate.getFullYear(), ate.getMonth(), ate.getDate())
+  // Arredonda porque horario de verao pode deixar o dia com 23 ou 25 horas.
+  return Math.round((b - a) / 86400000)
+}
+
+const HORA = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+/**
+ * "hoje 09:14", "ontem 20:11", "há 5 dias"... Hoje e ontem levam a hora
+ * junto porque sao os casos em que o vendedor precisa saber se a conversa
+ * acabou de acontecer ou foi no fim do expediente.
+ */
+export function quandoEntrou(iso) {
+  if (!iso) return '—'
+  const data = new Date(iso)
+  if (Number.isNaN(data.getTime())) return '—'
+
+  const dias = diasDeCalendario(data, new Date())
+  if (dias < 0) return HORA.format(data) // relógio adiantado: não invente futuro
+  if (dias === 0) return `hoje ${HORA.format(data)}`
+  if (dias === 1) return `ontem ${HORA.format(data)}`
+  if (dias < 30) return `há ${dias} dias`
+  const meses = Math.floor(dias / 30)
+  return `há ${meses} ${meses === 1 ? 'mês' : 'meses'}`
+}
+
 /** O lead tem nome de verdade, ou a gente esta caindo no telefone? */
 export function hasName(lead) {
   if (!lead) return false
