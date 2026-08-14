@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { AlertTriangle, ArrowLeft, Check, Eye, EyeOff, Loader2 } from 'lucide-react'
-import { esqueciSenha, login, precisaConfigurar, primeiroAcesso, redefinirSenha } from '../api'
+import { aceitarConvite, conferirConvite, esqueciSenha, login, precisaConfigurar, primeiroAcesso, redefinirSenha } from '../api'
 import { salvarSessao } from '../auth'
 
 // Telas: entrar | esqueci | redefinir (veio do link do e-mail) | configurar
@@ -11,15 +11,30 @@ export default function Login({ onEntrou }) {
   const [senha, setSenha] = useState('')
   const [nome, setNome] = useState('')
   const [novaSenha, setNovaSenha] = useState('')
+  const [repetir, setRepetir] = useState('')
   const [verSenha, setVerSenha] = useState(false)
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [tokenReset, setTokenReset] = useState(null)
+  const [tokenConvite, setTokenConvite] = useState(null)
+  const [papelConvite, setPapelConvite] = useState(null)
 
   useEffect(() => {
-    // Link de recuperação chega como ?reset=<token>
     const params = new URLSearchParams(window.location.search)
+
+    // Link de convite: ?convite=<token>
+    const conv = params.get('convite')
+    if (conv) {
+      setTokenConvite(conv)
+      setTela('convite')
+      conferirConvite(conv)
+        .then((r) => setPapelConvite(r.papel))
+        .catch((err) => { setErro(err.message); setTela('conviteInvalido') })
+      return
+    }
+
+    // Link de recuperação: ?reset=<token>
     const t = params.get('reset')
     if (t) {
       setTokenReset(t)
@@ -47,14 +62,16 @@ export default function Login({ onEntrou }) {
         salvarSessao(r.token, r.usuario)
         onEntrou(r.usuario)
       } else if (tela === 'configurar') {
-        const r = await primeiroAcesso({ nome, email })
-        setAviso(
-          r.emailEnviado
-            ? `Conta criada. Enviamos a senha para ${r.usuario.email} — confira a caixa de entrada.`
-            : `Conta criada. O e-mail ainda não está configurado, então anote a senha agora: ${r.senhaProvisoria}`
-        )
-        setTela('entrar')
-        setSenha('')
+        if (novaSenha !== repetir) throw new Error('As duas senhas não são iguais')
+        const r = await primeiroAcesso({ nome, email, senha: novaSenha })
+        salvarSessao(r.token, r.usuario)
+        onEntrou(r.usuario)
+      } else if (tela === 'convite') {
+        if (novaSenha !== repetir) throw new Error('As duas senhas não são iguais')
+        const r = await aceitarConvite({ token: tokenConvite, nome, email, senha: novaSenha })
+        salvarSessao(r.token, r.usuario)
+        limparUrl()
+        onEntrou(r.usuario)
       } else if (tela === 'esqueci') {
         const r = await esqueciSenha(email)
         setAviso(r.mensagem)
@@ -76,6 +93,13 @@ export default function Login({ onEntrou }) {
     esqueci: { t: 'Esqueci minha senha', s: 'Enviamos um link para você criar uma nova' },
     redefinir: { t: 'Criar nova senha', s: 'Escolha a senha que você vai usar daqui pra frente' },
     configurar: { t: 'Primeiro acesso', s: 'Crie a conta de gerente que vai administrar o CRM' },
+    convite: {
+      t: 'Criar seu acesso',
+      s: papelConvite === 'gerente'
+        ? 'Você foi convidado como gerente do CRM da VT Car'
+        : 'Você foi convidado para usar o CRM da VT Car',
+    },
+    conviteInvalido: { t: 'Convite não disponível', s: 'Peça um link novo a quem administra o CRM' },
   }[tela]
 
   const campo =
@@ -120,7 +144,7 @@ export default function Login({ onEntrou }) {
             </div>
           )}
 
-          {tela === 'configurar' && (
+          {(tela === 'configurar' || tela === 'convite') && (
             <div className="mb-4">
               <label className={rotulo} htmlFor="nome">Seu nome</label>
               <input
@@ -135,7 +159,7 @@ export default function Login({ onEntrou }) {
             </div>
           )}
 
-          {tela !== 'redefinir' && (
+          {tela !== 'redefinir' && tela !== 'conviteInvalido' && (
             <div className="mb-4">
               <label className={rotulo} htmlFor="email">E-mail</label>
               <input
@@ -152,20 +176,20 @@ export default function Login({ onEntrou }) {
             </div>
           )}
 
-          {(tela === 'entrar' || tela === 'redefinir') && (
+          {(tela === 'entrar' || tela === 'redefinir' || tela === 'configurar' || tela === 'convite') && (
             <div className="mb-2">
               <label className={rotulo} htmlFor="senha">
-                {tela === 'redefinir' ? 'Nova senha (mínimo 8 caracteres)' : 'Senha'}
+                {tela === 'entrar' ? 'Senha' : 'Escolha uma senha (mínimo 8 caracteres)'}
               </label>
               <div className="relative">
                 <input
                   id="senha"
                   type={verSenha ? 'text' : 'password'}
-                  value={tela === 'redefinir' ? novaSenha : senha}
-                  onChange={(e) => (tela === 'redefinir' ? setNovaSenha(e.target.value) : setSenha(e.target.value))}
+                  value={tela === 'entrar' ? senha : novaSenha}
+                  onChange={(e) => (tela === 'entrar' ? setSenha(e.target.value) : setNovaSenha(e.target.value))}
                   required
-                  minLength={tela === 'redefinir' ? 8 : undefined}
-                  autoComplete={tela === 'redefinir' ? 'new-password' : 'current-password'}
+                  minLength={tela === 'entrar' ? undefined : 8}
+                  autoComplete={tela === 'entrar' ? 'current-password' : 'new-password'}
                   autoFocus={tela === 'redefinir'}
                   className={`${campo} pr-11`}
                 />
@@ -181,6 +205,22 @@ export default function Login({ onEntrou }) {
             </div>
           )}
 
+          {(tela === 'configurar' || tela === 'convite') && (
+            <div className="mb-2 mt-4">
+              <label className={rotulo} htmlFor="repetir">Repita a senha</label>
+              <input
+                id="repetir"
+                type={verSenha ? 'text' : 'password'}
+                value={repetir}
+                onChange={(e) => setRepetir(e.target.value)}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className={campo}
+              />
+            </div>
+          )}
+
           {tela === 'entrar' && (
             <button
               type="button"
@@ -191,6 +231,7 @@ export default function Login({ onEntrou }) {
             </button>
           )}
 
+          {tela !== 'conviteInvalido' && (
           <button
             type="submit"
             disabled={carregando}
@@ -200,8 +241,10 @@ export default function Login({ onEntrou }) {
             {tela === 'entrar' && 'Entrar'}
             {tela === 'esqueci' && 'Enviar link de recuperação'}
             {tela === 'redefinir' && 'Salvar nova senha'}
-            {tela === 'configurar' && 'Criar conta de gerente'}
+            {tela === 'configurar' && 'Criar minha conta e entrar'}
+            {tela === 'convite' && 'Criar meu acesso'}
           </button>
+          )}
 
           {(tela === 'esqueci' || tela === 'redefinir') && (
             <button

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Check, KeyRound, Loader2, Trash2, UserPlus, Users2 } from 'lucide-react'
+import { AlertTriangle, Check, Copy, KeyRound, Link2, Loader2, Trash2, UserPlus, Users2, X } from 'lucide-react'
 import EmptyState from '../components/EmptyState'
-import { atualizarUsuario, criarUsuario, listarUsuarios, removerUsuario, reenviarSenha } from '../api'
+import { atualizarUsuario, criarConvite, criarUsuario, listarConvites, listarUsuarios, removerUsuario, reenviarSenha, revogarConvite } from '../api'
 
 const PAPEIS = [
   { id: 'vendedor', label: 'Vendedor', descricao: 'Usa o CRM; não mexe em usuários' },
@@ -17,11 +17,20 @@ export default function Usuarios({ usuarioAtual }) {
   const [aviso, setAviso] = useState(null)
   const [salvando, setSalvando] = useState(false)
   const [form, setForm] = useState({ nome: '', email: '', papel: 'vendedor' })
+  const [convites, setConvites] = useState([])
+  const [papelConvite, setPapelConvite] = useState('vendedor')
+  const [obsConvite, setObsConvite] = useState('')
+  const [linkNovo, setLinkNovo] = useState(null)
+  const [copiado, setCopiado] = useState(false)
+  const [gerando, setGerando] = useState(false)
+  const [modoDireto, setModoDireto] = useState(false)
 
   const carregar = async () => {
     setCarregando(true)
     try {
-      setLista(await listarUsuarios())
+      const [us, cs] = await Promise.all([listarUsuarios(), listarConvites().catch(() => [])])
+      setLista(us)
+      setConvites(cs)
       setErro(null)
     } catch (err) {
       setErro(err.message)
@@ -69,6 +78,34 @@ export default function Usuarios({ usuarioAtual }) {
     }
   }
 
+  const gerarLink = async (e) => {
+    e.preventDefault()
+    setGerando(true)
+    setErro(null)
+    setAviso(null)
+    setLinkNovo(null)
+    try {
+      const r = await criarConvite({ papel: papelConvite, observacao: obsConvite || null })
+      setLinkNovo(r.link)
+      setObsConvite('')
+      carregar()
+    } catch (err) {
+      setErro(err.message)
+    } finally {
+      setGerando(false)
+    }
+  }
+
+  const copiar = async (texto) => {
+    try {
+      await navigator.clipboard.writeText(texto)
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 1800)
+    } catch (err) {
+      setErro('Não consegui copiar automaticamente. Selecione o link e copie na mão.')
+    }
+  }
+
   const campo =
     'w-full bg-surface2 border border-line rounded-control px-3 h-10 text-[13.5px] outline-none focus:border-brand transition-colors'
 
@@ -89,11 +126,110 @@ export default function Usuarios({ usuarioAtual }) {
 
       <section className="bg-surface border border-line rounded-card shadow-card p-5">
         <h2 className="text-[13.5px] font-semibold flex items-center gap-1.5">
-          <UserPlus size={15} className="text-brand" />
-          Dar acesso a alguém
+          <Link2 size={15} className="text-brand" />
+          Convidar por link
         </h2>
         <p className="text-[12.5px] text-ink3 mt-0.5 mb-4">
-          A pessoa recebe a senha por e-mail e escolhe a própria no primeiro acesso.
+          Gere um link, mande pela pessoa por WhatsApp ou e-mail e ela mesma cria o acesso. O link vale 7 dias e só
+          funciona uma vez.
+        </p>
+
+        <form onSubmit={gerarLink} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2.5 items-end">
+          <div>
+            <label className="text-[12px] font-medium text-ink2 mb-1.5 block" htmlFor="c-obs">
+              Para quem é? <span className="text-ink3 font-normal">(opcional, só pra você lembrar)</span>
+            </label>
+            <input
+              id="c-obs"
+              value={obsConvite}
+              onChange={(e) => setObsConvite(e.target.value)}
+              className={campo}
+              placeholder="Maria do balcão"
+              maxLength={80}
+            />
+          </div>
+          <div>
+            <label className="text-[12px] font-medium text-ink2 mb-1.5 block" htmlFor="c-papel">Acesso</label>
+            <select id="c-papel" value={papelConvite} onChange={(e) => setPapelConvite(e.target.value)} className={`${campo} pr-8`}>
+              {PAPEIS.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={gerando}
+            className="bg-brand hover:bg-brandHover text-brandInk rounded-control h-10 px-4 text-[13px] font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
+          >
+            {gerando && <Loader2 size={14} className="animate-spin" />}
+            Gerar link
+          </button>
+        </form>
+
+        {linkNovo && (
+          <div className="mt-4 border border-line rounded-control bg-surface2 p-3">
+            <div className="text-[11.5px] text-ink3 mb-2">
+              Copie e mande para a pessoa. Este link aparece só agora — depois não dá pra recuperar, só gerar outro.
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={linkNovo}
+                onFocus={(e) => e.target.select()}
+                className="flex-1 bg-surface border border-line rounded-control px-3 h-10 text-[12.5px] outline-none"
+              />
+              <button
+                onClick={() => copiar(linkNovo)}
+                className="flex items-center gap-1.5 bg-brand hover:bg-brandHover text-brandInk rounded-control h-10 px-3.5 text-[12.5px] font-semibold transition-colors shrink-0"
+              >
+                {copiado ? <Check size={14} /> : <Copy size={14} />}
+                {copiado ? 'Copiado' : 'Copiar'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {convites.filter((c) => c.situacao === 'pendente').length > 0 && (
+          <div className="mt-4">
+            <div className="text-micro uppercase font-semibold text-ink3 mb-2">Convites aguardando</div>
+            <div className="flex flex-col gap-1.5">
+              {convites
+                .filter((c) => c.situacao === 'pendente')
+                .map((c) => (
+                  <div key={c.id} className="flex items-center gap-2 text-[12.5px] text-ink2 border border-line rounded-control px-3 py-2">
+                    <span className="font-medium text-ink">{c.observacao || 'Sem identificação'}</span>
+                    <span className="text-ink3">· {c.papel}</span>
+                    <span className="text-ink3 ml-auto tnum">vence {fmtData.format(new Date(c.expiraEm))}</span>
+                    <button
+                      onClick={() => mexer(() => revogarConvite(c.id), `Cancelar o convite de "${c.observacao || 'sem identificação'}"? O link para de funcionar.`)}
+                      title="Cancelar convite"
+                      className="grid place-items-center w-7 h-7 rounded-control text-ink3 hover:text-critical transition-colors shrink-0"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setModoDireto((v) => !v)}
+          className="text-[12px] text-ink3 hover:text-ink2 transition-colors mt-4"
+        >
+          {modoDireto ? 'Esconder' : 'Prefiro cadastrar a pessoa direto, sem link'}
+        </button>
+      </section>
+
+      <section className={`bg-surface border border-line rounded-card shadow-card p-5 ${modoDireto ? '' : 'hidden'}`}>
+        <h2 className="text-[13.5px] font-semibold flex items-center gap-1.5">
+          <UserPlus size={15} className="text-brand" />
+          Cadastrar direto
+        </h2>
+        <p className="text-[12.5px] text-ink3 mt-0.5 mb-4">
+          O sistema gera uma senha e envia por e-mail. Se o e-mail não estiver configurado, a senha aparece aqui pra
+          você repassar.
         </p>
 
         <form onSubmit={criar} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-2.5 items-end">
