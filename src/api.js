@@ -93,6 +93,23 @@ export function regenerateLeadCoach(id) {
   return request(`/api/leads/${id}/coach`, { method: 'POST' })
 }
 
+/* ---------- responsavel comercial (Entrega 002) ---------- */
+
+// O vendedor logado assume, pra si, um lead sem responsavel.
+export function assumirLead(id) {
+  return request(`/api/leads/${id}/assumir`, { method: 'POST' })
+}
+
+// So gerente: atribui ou transfere, passando o id de um usuario ativo.
+export function atribuirResponsavel(id, ownerId) {
+  return request(`/api/leads/${id}/responsavel`, { method: 'PATCH', body: JSON.stringify({ ownerId }) })
+}
+
+// So gerente: devolve o lead pra fila sem responsavel.
+export function removerResponsavel(id) {
+  return request(`/api/leads/${id}/responsavel`, { method: 'PATCH', body: JSON.stringify({ ownerId: null }) })
+}
+
 /* ---------- autenticação ---------- */
 
 export function precisaConfigurar() {
