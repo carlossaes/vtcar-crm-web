@@ -11,6 +11,8 @@ import Contatos from './pages/Contatos'
 import Usuarios from './pages/Usuarios'
 import Login from './pages/Login'
 import TrocarSenha from './pages/TrocarSenha'
+import LeadModal from './components/LeadModal'
+import NovaOportunidadeModal from './components/NovaOportunidadeModal'
 import { getToken, getUsuario, limparSessao, salvarSessao } from './auth'
 import { getApiBase, setApiBase, getLeads, updateLeadStage, meuUsuario, definirAoPerderSessao, listarUsuarios } from './api'
 
@@ -91,6 +93,10 @@ export default function App() {
   const [backendModalOpen, setBackendModalOpen] = useState(false)
   const [backendConnected, setBackendConnected] = useState(false)
   const [moveError, setMoveError] = useState(null)
+  const [oportunidadeModalOpen, setOportunidadeModalOpen] = useState(false)
+  // Lead/oportunidade aberto a partir de fora de Leads/Pipeline -- hoje so
+  // pelo botao "Abrir registro existente" do aviso de telefone duplicado.
+  const [leadAberto, setLeadAberto] = useState(null)
   const [theme, toggleTheme] = usePersistedTheme()
 
   const sair = useCallback(() => {
@@ -192,8 +198,29 @@ export default function App() {
     setLeads((current) => current.map((l) => (l.id === atualizado.id ? atualizado : l)))
   }, [])
 
-  const leadsCount = leads.length
-  const pipelineCount = leads.filter((l) => ['novo', 'qualificado', 'proposta', 'negociacao'].includes(l.stage)).length
+  // Oportunidade criada com sucesso: entra na lista, aparece na hora no
+  // Pipeline (coluna "Novo") e no Leads -- sem precisar de refresh.
+  const handleOportunidadeCriada = useCallback((nova) => {
+    setLeads((current) => [nova, ...current])
+    setOportunidadeModalOpen(false)
+  }, [])
+
+  // Telefone duplicado: fecha o formulario e abre o registro existente.
+  // O objeto que chega aqui e so o resumo devolvido pelo 409 (id, name,
+  // ownerName, stage) -- o LeadModal lida bem com campos ausentes, e
+  // messages/coach so carregam se o usuario tiver visibilidade sobre ele.
+  const handleAbrirExistente = useCallback((resumo) => {
+    setOportunidadeModalOpen(false)
+    setLeadAberto(resumo)
+  }, [])
+
+  // Leads e Pipeline nao sao mais duas visoes do mesmo conjunto -- os
+  // contadores da barra lateral seguem a mesma divisao (ajuste de
+  // 15/09/2026): Leads conta caixa de entrada, Pipeline conta so oportunidade.
+  const leadsCount = leads.filter((l) => l.recordType !== 'opportunity').length
+  const pipelineCount = leads.filter(
+    (l) => l.recordType === 'opportunity' && ['novo', 'qualificado', 'proposta', 'negociacao'].includes(l.stage)
+  ).length
   const meta = PAGES[page]
 
   // Tela em branco enquanto confirmamos o token, pra nao piscar o login
@@ -231,7 +258,7 @@ export default function App() {
           subtitle={meta.subtitle}
           onConfigureBackend={() => setBackendModalOpen(true)}
           backendConnected={backendConnected}
-          onNewLead={() => setPage('leads')}
+          onNovaOportunidade={() => setOportunidadeModalOpen(true)}
           search={search}
           onSearch={setSearch}
           theme={theme}
@@ -292,6 +319,30 @@ export default function App() {
           setApiBase(url)
           setBackendModalOpen(false)
           refreshLeads()
+        }}
+      />
+
+      <NovaOportunidadeModal
+        open={oportunidadeModalOpen}
+        usuario={usuario}
+        vendedores={equipe}
+        onClose={() => setOportunidadeModalOpen(false)}
+        onCreated={handleOportunidadeCriada}
+        onAbrirExistente={handleAbrirExistente}
+      />
+
+      <LeadModal
+        lead={leadAberto}
+        usuario={usuario}
+        vendedores={equipe}
+        onClose={() => setLeadAberto(null)}
+        onMoveStage={async (id, stage) => {
+          await handleMoveStage(id, stage)
+          setLeadAberto(null)
+        }}
+        onLeadChanged={(atualizado) => {
+          handleLeadChanged(atualizado)
+          setLeadAberto(atualizado)
         }}
       />
     </div>
