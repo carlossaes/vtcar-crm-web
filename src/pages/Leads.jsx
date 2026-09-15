@@ -13,7 +13,13 @@ export default function Leads({ leads, search, usuario, vendedores = [], onMoveS
   const [ownerFilter, setOwnerFilter] = useState('todos')
   const ehGerente = usuario?.papel === 'gerente'
 
-  const byStage = useMemo(() => (filter === 'todos' ? leads : leads.filter((l) => l.stage === filter)), [leads, filter])
+  // Leads e a caixa de entrada / triagem -- so mostra o que ainda e lead.
+  // Assim que alguem assume (ou uma oportunidade e criada direto), o
+  // registro "sai" daqui e passa a aparecer no Pipeline. Ver
+  // ENTREGA-003-HANDOFF-CTO.md, ajuste de 15/09/2026.
+  const soLeads = useMemo(() => leads.filter((l) => l.recordType !== 'opportunity'), [leads])
+
+  const byStage = useMemo(() => (filter === 'todos' ? soLeads : soLeads.filter((l) => l.stage === filter)), [soLeads, filter])
 
   const byOwner = useMemo(() => {
     if (!ehGerente || ownerFilter === 'todos') return byStage
@@ -129,7 +135,7 @@ export default function Leads({ leads, search, usuario, vendedores = [], onMoveS
             </tbody>
           </table>
         </div>
-      ) : leads.length === 0 ? (
+      ) : soLeads.length === 0 ? (
         <EmptyState
           icon={Users2}
           title="Nenhum lead por aqui ainda"
