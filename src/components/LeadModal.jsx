@@ -312,6 +312,7 @@ export default function LeadModal({ lead, usuario, vendedores = [], onClose, onM
                 <Field label="Telefone" value={formatPhone(lead.phone)} />
                 <Field label="E-mail" value={lead.email} />
                 <Field label="Veículo de interesse" value={lead.vehicleInterest || 'A confirmar'} />
+                <Field label="Origem" value={lead.origin} />
                 <Field
                   label="Entrou em"
                   value={lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('pt-BR') : null}
