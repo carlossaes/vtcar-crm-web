@@ -69,10 +69,20 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
   const ehGerente = usuario?.papel === 'gerente'
 
   const filtered = useMemo(() => {
-    let base = leads
-    if (ehGerente && ownerFilter !== 'todos') {
-      base = ownerFilter === 'sem-responsavel' ? base.filter((l) => !l.ownerId) : base.filter((l) => l.ownerId === ownerFilter)
-    }
+    // Pipeline e a carteira comercial: so oportunidade entra aqui. Lead
+    // livre (sem responsavel, recordType "lead") fica na caixa de entrada
+    // (tela Leads) ate alguem assumir -- ai sim ele vira oportunidade e
+    // aparece aqui. Ver ENTREGA-003-HANDOFF-CTO.md, ajuste de 15/09/2026.
+    let base = leads.filter((l) => l.recordType === 'opportunity')
+    // O backend ja so manda pro vendedor o que e dele (podeVerLead), mas a
+    // regra pedida e explicita: "recordType opportunity AND ownerId =
+    // usuario logado". Reforça aqui tambem, sem depender so do que a API
+    // devolveu.
+    base = ehGerente
+      ? ownerFilter !== 'todos'
+        ? base.filter((l) => l.ownerId === ownerFilter)
+        : base
+      : base.filter((l) => l.ownerId === usuario?.id)
     if (!search) return base
     const q = search.toLowerCase()
     return base.filter(
@@ -83,7 +93,7 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
         (l.channel || '').toLowerCase().includes(q) ||
         (l.vehicleInterest || '').toLowerCase().includes(q)
     )
-  }, [leads, search, ownerFilter, ehGerente])
+  }, [leads, search, ownerFilter, ehGerente, usuario])
 
   const byStage = useMemo(() => {
     const map = Object.fromEntries(COLUMNS.map((c) => [c, []]))
@@ -128,7 +138,6 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
             className="bg-surface2 border border-line rounded-control px-2.5 h-8 text-[12.5px] outline-none focus:border-brand"
           >
             <option value="todos">Todos</option>
-            <option value="sem-responsavel">Sem responsável</option>
             {vendedores.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.nome}
