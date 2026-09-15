@@ -5,7 +5,7 @@ export default function Topbar({
   subtitle,
   onConfigureBackend,
   backendConnected,
-  onNewLead,
+  onNovaOportunidade,
   search,
   onSearch,
   theme,
@@ -53,11 +53,11 @@ export default function Topbar({
       </button>
 
       <button
-        onClick={onNewLead}
+        onClick={onNovaOportunidade}
         className="flex items-center gap-1.5 bg-brand hover:bg-brandHover transition-colors text-brandInk rounded-control px-3.5 h-9 text-[13px] font-semibold whitespace-nowrap"
       >
         <Plus size={15} strokeWidth={2.5} />
-        Novo lead
+        Nova oportunidade
       </button>
     </header>
   )
