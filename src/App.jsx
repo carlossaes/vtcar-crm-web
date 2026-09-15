@@ -12,7 +12,7 @@ import Usuarios from './pages/Usuarios'
 import Login from './pages/Login'
 import TrocarSenha from './pages/TrocarSenha'
 import { getToken, getUsuario, limparSessao, salvarSessao } from './auth'
-import { getApiBase, setApiBase, getLeads, updateLeadStage, meuUsuario, definirAoPerderSessao } from './api'
+import { getApiBase, setApiBase, getLeads, updateLeadStage, meuUsuario, definirAoPerderSessao, listarUsuarios } from './api'
 
 // Chave nova de proposito. A anterior ("vtcar_theme") era gravada na montagem,
 // entao quem so abriu o CRM enquanto o escuro era padrao ficou com "dark"
@@ -86,6 +86,7 @@ export default function App() {
   const [validandoSessao, setValidandoSessao] = useState(() => Boolean(getToken()))
   const [page, setPage] = useState('dashboard')
   const [leads, setLeads] = useState([])
+  const [equipe, setEquipe] = useState([])
   const [search, setSearch] = useState('')
   const [backendModalOpen, setBackendModalOpen] = useState(false)
   const [backendConnected, setBackendConnected] = useState(false)
@@ -148,6 +149,27 @@ export default function App() {
     return () => clearInterval(interval)
   }, [refreshLeads, usuario])
 
+  // A lista de vendedores ativos so serve pro gerente (filtro por
+  // responsável e "repassar lead") — um vendedor comum nao tem permissão
+  // pra chamar GET /api/usuarios, entao nem tentamos.
+  useEffect(() => {
+    if (!usuario || usuario.papel !== 'gerente' || usuario.precisaTrocarSenha) {
+      setEquipe([])
+      return
+    }
+    let cancelado = false
+    listarUsuarios()
+      .then((lista) => {
+        if (!cancelado) setEquipe(Array.isArray(lista) ? lista.filter((u) => u.papel === 'vendedor' && u.ativo) : [])
+      })
+      .catch(() => {
+        if (!cancelado) setEquipe([])
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [usuario])
+
   // Move otimista: o card muda de coluna na hora e so depois confirma com a
   // API. Se o backend recusar, volta pro estado anterior e avisa.
   const handleMoveStage = async (id, stage) => {
@@ -163,6 +185,12 @@ export default function App() {
       setTimeout(() => setMoveError(null), 4000)
     }
   }
+
+  // Depois de assumir/repassar/remover responsável, o backend devolve o
+  // lead inteiro atualizado — so precisa substituir no lugar.
+  const handleLeadChanged = useCallback((atualizado) => {
+    setLeads((current) => current.map((l) => (l.id === atualizado.id ? atualizado : l)))
+  }, [])
 
   const leadsCount = leads.length
   const pipelineCount = leads.filter((l) => ['novo', 'qualificado', 'proposta', 'negociacao'].includes(l.stage)).length
@@ -212,8 +240,26 @@ export default function App() {
 
         <main className="flex-1 p-6 max-w-[1400px] w-full">
           {page === 'dashboard' && <Dashboard leads={leads} onGoToLeads={() => setPage('leads')} />}
-          {page === 'leads' && <Leads leads={leads} search={search} onMoveStage={handleMoveStage} />}
-          {page === 'pipeline' && <Pipeline leads={leads} search={search} onMoveStage={handleMoveStage} />}
+          {page === 'leads' && (
+            <Leads
+              leads={leads}
+              search={search}
+              usuario={usuario}
+              vendedores={equipe}
+              onMoveStage={handleMoveStage}
+              onLeadChanged={handleLeadChanged}
+            />
+          )}
+          {page === 'pipeline' && (
+            <Pipeline
+              leads={leads}
+              search={search}
+              usuario={usuario}
+              vendedores={equipe}
+              onMoveStage={handleMoveStage}
+              onLeadChanged={handleLeadChanged}
+            />
+          )}
           {page === 'contatos' && <Contatos search={search} usuario={usuario} />}
           {paginaAtual === 'usuarios' && <Usuarios usuarioAtual={usuario} />}
           {meta.soon && (
