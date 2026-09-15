@@ -7,16 +7,24 @@ import LeadModal from '../components/LeadModal'
 
 const FILTERS = [{ id: 'todos', label: 'Todos' }, ...STAGE_ORDER.map((s) => ({ id: s, label: STAGE_META[s].label }))]
 
-export default function Leads({ leads, search, onMoveStage }) {
+export default function Leads({ leads, search, usuario, vendedores = [], onMoveStage, onLeadChanged }) {
   const [selected, setSelected] = useState(null)
   const [filter, setFilter] = useState('todos')
+  const [ownerFilter, setOwnerFilter] = useState('todos')
+  const ehGerente = usuario?.papel === 'gerente'
 
   const byStage = useMemo(() => (filter === 'todos' ? leads : leads.filter((l) => l.stage === filter)), [leads, filter])
 
+  const byOwner = useMemo(() => {
+    if (!ehGerente || ownerFilter === 'todos') return byStage
+    if (ownerFilter === 'sem-responsavel') return byStage.filter((l) => !l.ownerId)
+    return byStage.filter((l) => l.ownerId === ownerFilter)
+  }, [byStage, ownerFilter, ehGerente])
+
   const filtered = useMemo(() => {
-    if (!search) return byStage
+    if (!search) return byOwner
     const q = search.toLowerCase()
-    return byStage.filter(
+    return byOwner.filter(
       (l) =>
         (l.name || '').toLowerCase().includes(q) ||
         (l.phone || '').includes(q) ||
@@ -24,7 +32,7 @@ export default function Leads({ leads, search, onMoveStage }) {
         (l.channel || '').toLowerCase().includes(q) ||
         (l.vehicleInterest || '').toLowerCase().includes(q)
     )
-  }, [byStage, search])
+  }, [byOwner, search])
 
   return (
     <section className="bg-surface border border-line rounded-card shadow-card overflow-hidden">
@@ -32,6 +40,21 @@ export default function Leads({ leads, search, onMoveStage }) {
         <h2 className="text-[13.5px] font-semibold mr-auto">
           Leads <span className="text-ink3 font-normal tnum">({filtered.length})</span>
         </h2>
+        {ehGerente && (
+          <select
+            value={ownerFilter}
+            onChange={(e) => setOwnerFilter(e.target.value)}
+            className="bg-surface2 border border-line rounded-control px-2.5 h-8 text-[12.5px] outline-none focus:border-brand"
+          >
+            <option value="todos">Todos os responsáveis</option>
+            <option value="sem-responsavel">Sem responsável</option>
+            {vendedores.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.nome}
+              </option>
+            ))}
+          </select>
+        )}
         <div className="flex items-center gap-1 bg-surface2 border border-line rounded-control p-0.5">
           {FILTERS.map((f) => (
             <button
@@ -56,6 +79,7 @@ export default function Leads({ leads, search, onMoveStage }) {
                 <th className="py-2.5 px-3 font-semibold">Canal</th>
                 <th className="py-2.5 px-3 font-semibold">Interesse</th>
                 <th className="py-2.5 px-3 font-semibold">Telefone</th>
+                <th className="py-2.5 px-3 font-semibold">Responsável</th>
                 <th className="py-2.5 px-3 font-semibold">Estágio</th>
                 <th className="py-2.5 px-5 font-semibold text-right">Entrada</th>
               </tr>
@@ -87,6 +111,13 @@ export default function Leads({ leads, search, onMoveStage }) {
                   </td>
                   <td className="py-3 px-3 text-[13px] text-ink2">{lead.vehicleInterest || 'A confirmar'}</td>
                   <td className="py-3 px-3 text-[13px] text-ink2 tnum">{formatPhone(lead.phone) || '—'}</td>
+                  <td className="py-3 px-3 text-[13px]">
+                    {lead.ownerName ? (
+                      <span className="text-ink2">{lead.ownerName}</span>
+                    ) : (
+                      <span className="text-ink3">Sem responsável</span>
+                    )}
+                  </td>
                   <td className="py-3 px-3">
                     <StageBadge stage={lead.stage} />
                   </td>
@@ -114,10 +145,16 @@ export default function Leads({ leads, search, onMoveStage }) {
 
       <LeadModal
         lead={selected}
+        usuario={usuario}
+        vendedores={vendedores}
         onClose={() => setSelected(null)}
         onMoveStage={async (id, stage) => {
           await onMoveStage(id, stage)
           setSelected(null)
+        }}
+        onLeadChanged={(atualizado) => {
+          onLeadChanged(atualizado)
+          setSelected(atualizado)
         }}
       />
     </section>
