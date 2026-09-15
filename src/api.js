@@ -50,8 +50,13 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     // O backend manda { error: "mensagem" }; preferimos ela ao "HTTP 400" cru.
+    // Guarda status e corpo inteiro no erro -- alguns endpoints (ex: 409 de
+    // telefone duplicado) mandam dados extras que a tela precisa exibir.
     const corpo = await res.json().catch(() => null)
-    throw new Error(corpo?.error || `HTTP ${res.status}`)
+    const erro = new Error(corpo?.error || `HTTP ${res.status}`)
+    erro.status = res.status
+    erro.body = corpo
+    throw erro
   }
   if (res.status === 204) return null
   return res.json()
