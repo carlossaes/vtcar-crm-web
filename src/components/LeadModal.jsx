@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Sparkles, Copy, Check, RefreshCw, MessagesSquare } from 'lucide-react'
+import { X, Sparkles, Copy, Check, RefreshCw, MessagesSquare, UserCheck } from 'lucide-react'
 import { ChannelBadge, StageBadge, STAGE_META } from './Badge'
 import EmptyState from './EmptyState'
 import { displayName, formatPhone } from '../format'
-import { getLeadMessages, getLeadCoach, regenerateLeadCoach } from '../api'
+import { getLeadMessages, getLeadCoach, regenerateLeadCoach, assumirLead, atribuirResponsavel, removerResponsavel } from '../api'
 
 const MOVABLE = ['novo', 'qualificado', 'proposta', 'negociacao', 'fechado', 'perdido']
 
@@ -37,6 +37,100 @@ function MessageBubble({ message }) {
           {new Date(message.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
+    </div>
+  )
+}
+
+// Responsável comercial — quem é o vendedor dono do lead, e as ações pra
+// assumir (qualquer usuário logado) ou repassar/remover (só gerente).
+function OwnerPanel({ lead, usuario, vendedores, onLeadChanged }) {
+  const [carregando, setCarregando] = useState(false)
+  const [erro, setErro] = useState(null)
+  const ehGerente = usuario?.papel === 'gerente'
+
+  const executar = async (fn) => {
+    setCarregando(true)
+    setErro(null)
+    try {
+      const atualizado = await fn()
+      onLeadChanged(atualizado)
+    } catch (err) {
+      setErro(err.message)
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  return (
+    <div className="rounded-card border border-line bg-surface2/50 p-4">
+      <div className="flex items-center gap-1.5 text-[13px] font-semibold mb-3">
+        <UserCheck size={14} className="text-brand" />
+        Responsável comercial
+      </div>
+
+      {erro && (
+        <div className="text-[12px] text-critical bg-critical/10 border border-critical/25 rounded-control px-2.5 py-1.5 mb-2.5">
+          {erro}
+        </div>
+      )}
+
+      {!lead.ownerId ? (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[13.5px] text-ink2">Sem responsável</span>
+          <button
+            onClick={() => executar(() => assumirLead(lead.id))}
+            disabled={carregando}
+            className="bg-brand hover:bg-brandHover text-brandInk rounded-control h-9 px-3.5 text-[12.5px] font-semibold transition-colors disabled:opacity-60"
+          >
+            Assumir lead
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[13.5px] font-medium">{lead.ownerName}</div>
+              {lead.ownerAssignedAt && (
+                <div className="text-[11.5px] text-ink3 mt-0.5">
+                  Assumido em {new Date(lead.ownerAssignedAt).toLocaleString('pt-BR')}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {ehGerente && (
+            <div className="flex items-center gap-2">
+              <select
+                defaultValue=""
+                disabled={carregando}
+                onChange={(e) => {
+                  const novoId = e.target.value
+                  e.target.value = ''
+                  if (!novoId) return
+                  executar(() => atribuirResponsavel(lead.id, novoId))
+                }}
+                className="flex-1 bg-surface border border-line rounded-control px-2.5 h-9 text-[12.5px] outline-none focus:border-brand"
+              >
+                <option value="">Repassar lead para…</option>
+                {vendedores
+                  .filter((v) => v.id !== lead.ownerId)
+                  .map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.nome}
+                    </option>
+                  ))}
+              </select>
+              <button
+                onClick={() => executar(() => removerResponsavel(lead.id))}
+                disabled={carregando}
+                className="border border-line rounded-control h-9 px-3 text-[12.5px] font-medium text-ink2 hover:text-ink hover:border-lineStrong transition-colors disabled:opacity-60"
+              >
+                Remover
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -161,7 +255,7 @@ function CoachPanel({ leadId }) {
   )
 }
 
-export default function LeadModal({ lead, onClose, onMoveStage }) {
+export default function LeadModal({ lead, usuario, vendedores = [], onClose, onMoveStage, onLeadChanged }) {
   const [messages, setMessages] = useState([])
 
   useEffect(() => {
@@ -223,6 +317,8 @@ export default function LeadModal({ lead, onClose, onMoveStage }) {
                   value={lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('pt-BR') : null}
                 />
               </div>
+
+              <OwnerPanel lead={lead} usuario={usuario} vendedores={vendedores} onLeadChanged={onLeadChanged} />
 
               <div>
                 <div className="text-micro uppercase font-semibold text-ink3 mb-2">Mover para</div>
