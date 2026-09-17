@@ -4,11 +4,12 @@ import { GripVertical, Inbox } from 'lucide-react'
 import { ChannelBadge, STAGE_META } from '../components/Badge'
 import { displayName, formatPhone, quandoEntrou } from '../format'
 import LeadModal from '../components/LeadModal'
+import { formatBRL, pipelineIndicators } from '../opportunity'
 
 // O funil inteiro, incluindo as duas saidas (fechado e perdido).
 const COLUMNS = ['novo', 'qualificado', 'proposta', 'negociacao', 'fechado', 'perdido']
 
-function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, onDragEnd }) {
+export function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, onDragEnd }) {
   return (
     <motion.article
       layout
@@ -46,8 +47,13 @@ function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, onDragE
           aria-hidden="true"
         />
       </div>
+      <div className="text-[14px] font-semibold mt-2">{formatBRL(lead.negotiatedValue ?? lead.assetValue ?? 0)}</div>
+      {lead.assetValue != null && lead.negotiatedValue != null && lead.assetValue !== lead.negotiatedValue && (
+        <div className="text-[11px] text-ink3"><div>Bem: {formatBRL(lead.assetValue)}</div><div>Negociado: {formatBRL(lead.negotiatedValue)}</div></div>
+      )}
+      {lead.hasTradeIn && <div className="text-[11.5px] text-brand mt-1">Com troca</div>}
       <div className="flex items-center justify-between gap-2 mt-2.5">
-        <ChannelBadge channel={lead.channel} />
+        <ChannelBadge channel={lead.origin || lead.channel} />
         <span className="text-[11.5px] text-ink3 tnum shrink-0">{quandoEntrou(lead.createdAt)}</span>
       </div>
       <div className="text-[11.5px] mt-1.5 truncate">
@@ -103,6 +109,7 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
     })
     return map
   }, [filtered])
+  const indicators = useMemo(() => pipelineIndicators(filtered), [filtered])
 
   const handleDragStart = (e, lead) => {
     setDraggingId(lead.id)
@@ -129,10 +136,22 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
 
   return (
     <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-4" aria-label="Indicadores financeiros">
+        {[
+          ['Pipeline aberto', formatBRL(indicators.openValue), `${indicators.openCount} oportunidades abertas`],
+          ['Vendas fechadas', formatBRL(indicators.closedValue), `${indicators.closedCount} veículos vendidos`],
+          ['Ticket médio', formatBRL(indicators.average), 'Por veículo vendido'],
+          ['Perdidas', formatBRL(indicators.lostValue), `${indicators.lostCount} oportunidades perdidas`],
+          ['Conversão', `${indicators.conversion.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`, 'Fechadas / (fechadas + perdidas)'],
+        ].map(([title, value, subtitle]) => <section key={title} aria-label={title} className="bg-surface border border-line rounded-card p-4">
+          <h2 className="text-micro uppercase text-ink3 font-semibold">{title}</h2><div className="text-[19px] font-bold tnum my-1">{value}</div><p className="text-[11.5px] text-ink2">{subtitle}</p>
+        </section>)}
+      </div>
       {ehGerente && (
         <div className="flex items-center gap-2 mb-3">
           <span className="text-[12px] text-ink3">Responsável:</span>
           <select
+            aria-label="Filtrar por vendedor"
             value={ownerFilter}
             onChange={(e) => setOwnerFilter(e.target.value)}
             className="bg-surface2 border border-line rounded-control px-2.5 h-8 text-[12.5px] outline-none focus:border-brand"
