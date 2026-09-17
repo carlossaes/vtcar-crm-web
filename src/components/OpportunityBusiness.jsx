@@ -18,7 +18,11 @@ export default function OpportunityBusiness({ lead, usuario, onLeadChanged }) {
     event.preventDefault()
     if (!editing || !canEdit || saving) return
     setSaving(true); setError('')
-    try { onLeadChanged(await updateOpportunity(lead.id, commercialPayload(form))); setEditing(false) }
+    try {
+      const data = commercialPayload(form)
+      delete data.vehicleInterest
+      onLeadChanged(await updateOpportunity(lead.id, data)); setEditing(false)
+    }
     catch (err) { setError(err.message) }
     finally { setSaving(false) }
   }
