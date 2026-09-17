@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, AlertTriangle, Loader2 } from 'lucide-react'
 import { StageBadge } from './Badge'
 import { createLead } from '../api'
+import CommercialFields from './CommercialFields'
+import { commercialPayload } from '../opportunity'
 
 // Lista fixa nesta entrega -- virar cadastro configuravel fica pra depois.
 export const ORIGENS = ['Webmotors', 'OLX', 'iCarros', 'Indicação', 'Loja', 'Telefone', 'Instagram', 'Outro']
@@ -45,6 +47,7 @@ export default function NovaOportunidadeModal({ open, usuario, vendedores = [], 
     setSalvando(true)
     try {
       const dados = {
+        ...commercialPayload(form),
         name: form.name.trim(),
         phone: form.phone.trim(),
         email: form.email.trim() || null,
@@ -140,6 +143,7 @@ export default function NovaOportunidadeModal({ open, usuario, vendedores = [], 
                     </div>
                   )}
 
+                  <h3 className="text-micro uppercase font-semibold text-ink3">Cliente</h3>
                   <div>
                     <label className={label} htmlFor="op-nome">Nome *</label>
                     <input id="op-nome" required value={form.name} onChange={mudar('name')} className={campo} placeholder="Nome do cliente" />
@@ -156,10 +160,7 @@ export default function NovaOportunidadeModal({ open, usuario, vendedores = [], 
                     </div>
                   </div>
 
-                  <div>
-                    <label className={label} htmlFor="op-veiculo">Veículo de interesse</label>
-                    <input id="op-veiculo" value={form.vehicleInterest} onChange={mudar('vehicleInterest')} className={campo} placeholder="opcional" />
-                  </div>
+                  <h3 className="text-micro uppercase font-semibold text-ink3">Negócio</h3>
 
                   <div>
                     <label className={label} htmlFor="op-origem">Origem *</label>
@@ -171,10 +172,7 @@ export default function NovaOportunidadeModal({ open, usuario, vendedores = [], 
                     </select>
                   </div>
 
-                  <div>
-                    <label className={label} htmlFor="op-obs">Observação</label>
-                    <textarea id="op-obs" value={form.notes} onChange={mudar('notes')} rows={2} className={`${campo} h-auto py-2 resize-none`} placeholder="opcional" />
-                  </div>
+                  <CommercialFields form={form} setForm={setForm} creation />
 
                   <div>
                     <label className={label}>Responsável comercial</label>
@@ -187,7 +185,7 @@ export default function NovaOportunidadeModal({ open, usuario, vendedores = [], 
                         aria-label="Responsável comercial"
                       >
                         <option value="" disabled>Selecione um vendedor…</option>
-                        {vendedores.map((v) => (
+                        {vendedores.filter((v) => v.ativo !== false && v.papel === 'vendedor').map((v) => (
                           <option key={v.id} value={v.id}>{v.nome}</option>
                         ))}
                       </select>
