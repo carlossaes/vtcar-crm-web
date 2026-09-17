@@ -9,9 +9,15 @@ export default function OpportunityBusiness({ lead, usuario, onLeadChanged }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const canEdit = usuario?.papel === 'gerente' || (usuario?.papel === 'vendedor' && usuario.id === lead.ownerId)
-  useEffect(() => { setForm(lead); setEditing(false); setError('') }, [lead])
+  // Refreshes may replace the lead object without changing the opportunity.
+  // Keep the active draft; LeadModal's key={lead.id} resets only on a new record.
+  useEffect(() => {
+    if (!editing) { setForm(lead); setError('') }
+  }, [lead, editing])
   const save = async (event) => {
-    event.preventDefault(); setSaving(true); setError('')
+    event.preventDefault()
+    if (!editing || !canEdit || saving) return
+    setSaving(true); setError('')
     try { onLeadChanged(await updateOpportunity(lead.id, commercialPayload(form))); setEditing(false) }
     catch (err) { setError(err.message) }
     finally { setSaving(false) }
@@ -20,9 +26,9 @@ export default function OpportunityBusiness({ lead, usuario, onLeadChanged }) {
     <CommercialFields form={form} setForm={setForm} readOnly={!editing || !canEdit} />
     {error && <p role="alert" className="text-critical text-[13px]">{error}</p>}
     {canEdit && <div className="flex gap-3">
-      {editing ? <><button disabled={saving} className="bg-brand text-brandInk rounded-control px-3 py-2" type="submit">{saving ? 'Salvando…' : 'Salvar negócio'}</button>
-        <button disabled={saving} type="button" onClick={() => { setForm(lead); setEditing(false); setError('') }}>Cancelar</button></>
-        : <button className="border border-line rounded-control px-3 py-2" type="button" onClick={() => setEditing(true)}>Editar negócio</button>}
+      {editing ? <><button key="save" disabled={saving} className="bg-brand text-brandInk rounded-control px-3 py-2" type="submit">{saving ? 'Salvando…' : 'Salvar negócio'}</button>
+        <button key="cancel" disabled={saving} type="button" onClick={() => { setForm(lead); setEditing(false); setError('') }}>Cancelar</button></>
+        : <button key="edit" className="border border-line rounded-control px-3 py-2" type="button" onClick={(event) => { event.preventDefault(); setForm(lead); setEditing(true) }}>Editar negócio</button>}
     </div>}
   </form>
 }
