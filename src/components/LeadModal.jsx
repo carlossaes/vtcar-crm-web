@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Sparkles, Copy, Check, RefreshCw, MessagesSquare, UserCheck } from 'lucide-react'
 import { ChannelBadge, StageBadge, STAGE_META } from './Badge'
 import EmptyState from './EmptyState'
+import OpportunityBusiness from './OpportunityBusiness'
 import { displayName, formatPhone } from '../format'
 import { getLeadMessages, getLeadCoach, regenerateLeadCoach, assumirLead, atribuirResponsavel, removerResponsavel } from '../api'
 
@@ -308,11 +309,12 @@ export default function LeadModal({ lead, usuario, vendedores = [], onClose, onM
             </header>
 
             <div className="px-6 py-5 space-y-5">
+              <h3 className="text-micro uppercase font-semibold text-ink3">Cliente</h3>
               <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                <Field label="Nome" value={displayName(lead)} />
                 <Field label="Telefone" value={formatPhone(lead.phone)} />
                 <Field label="E-mail" value={lead.email} />
-                <Field label="Veículo de interesse" value={lead.vehicleInterest || 'A confirmar'} />
-                <Field label="Origem" value={lead.origin} />
+                {lead.recordType !== 'opportunity' && <Field label="Veículo de interesse" value={lead.vehicleInterest || 'A confirmar'} />}
                 <Field
                   label="Entrou em"
                   value={lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('pt-BR') : null}
@@ -320,9 +322,11 @@ export default function LeadModal({ lead, usuario, vendedores = [], onClose, onM
               </div>
 
               <OwnerPanel lead={lead} usuario={usuario} vendedores={vendedores} onLeadChanged={onLeadChanged} />
+              <section><h3 className="text-micro uppercase font-semibold text-ink3 mb-2">Origem</h3><p className="text-[13.5px]">{lead.origin || lead.channel || 'Não informado'}</p></section>
+              {lead.recordType === 'opportunity' && <OpportunityBusiness key={lead.id} lead={lead} usuario={usuario} onLeadChanged={onLeadChanged} />}
 
               <div>
-                <div className="text-micro uppercase font-semibold text-ink3 mb-2">Mover para</div>
+                <h3 className="text-micro uppercase font-semibold text-ink3 mb-2">Pipeline</h3>
                 <div className="flex flex-wrap gap-1.5">
                   {MOVABLE.filter((s) => s !== lead.stage).map((s) => (
                     <button
