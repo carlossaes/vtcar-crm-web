@@ -1,4 +1,5 @@
 import { moneyFields, payments, formatBRL } from '../opportunity'
+import CurrencyInput from './CurrencyInput'
 
 const control = 'w-full bg-surface2 border border-line rounded-control px-3 py-2 text-[13.5px] outline-none focus:border-brand'
 export function CommercialSection({ title, children }) {
@@ -11,7 +12,8 @@ export default function CommercialFields({ form, setForm, readOnly = false, crea
     {title}
     {readOnly || (field === 'vehicleInterest' && !creation) ? <div className="text-[13.5px] text-ink mt-1">{numeric && field !== 'installmentsCount'
       ? (form[field] == null ? 'Não informado' : formatBRL(form[field])) : (form[field] ?? '') || 'Não informado'}</div>
-      : <input aria-label={title} className={control} type={numeric ? 'number' : 'text'}
+      : numeric && field !== 'installmentsCount' ? <CurrencyInput label={title} className={control} value={form[field]} onChange={(value) => change(field, value)} />
+      : <input aria-label={title} className={control} type="text" inputMode={numeric ? 'numeric' : undefined}
         min={field === 'installmentsCount' ? 1 : 0} step={field === 'installmentsCount' ? 1 : '0.01'}
         required={creation && field === 'vehicleInterest'} value={form[field] ?? ''}
         onChange={(e) => change(field, e.target.value)} />}
