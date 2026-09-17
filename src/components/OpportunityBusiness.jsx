@@ -26,7 +26,7 @@ export default function OpportunityBusiness({ lead, usuario, onLeadChanged }) {
     catch (err) { setError(err.message) }
     finally { setSaving(false) }
   }
-  return <form onSubmit={save} className="space-y-4">
+  return <form noValidate onSubmit={save} className="space-y-4">
     <CommercialFields form={form} setForm={setForm} readOnly={!editing || !canEdit} />
     {error && <p role="alert" className="text-critical text-[13px]">{error}</p>}
     {canEdit && <div className="flex gap-3">
