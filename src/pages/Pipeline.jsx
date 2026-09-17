@@ -4,10 +4,19 @@ import { GripVertical, Inbox } from 'lucide-react'
 import { ChannelBadge, STAGE_META } from '../components/Badge'
 import { displayName, formatPhone, quandoEntrou } from '../format'
 import LeadModal from '../components/LeadModal'
-import { formatBRL, pipelineIndicators } from '../opportunity'
+import { effectiveValue, formatBRL, pipelineIndicators } from '../opportunity'
 
 // O funil inteiro, incluindo as duas saidas (fechado e perdido).
 const COLUMNS = ['novo', 'qualificado', 'proposta', 'negociacao', 'fechado', 'perdido']
+// Percentual comercial fixo por estágio, não uma previsão estatística.
+const COLUMN_META = {
+  novo: { chance: 10, badge: 'bg-sky-50 text-sky-800' },
+  qualificado: { chance: 25, badge: 'bg-blue-100 text-blue-800' },
+  proposta: { chance: 50, badge: 'bg-orange-50 text-orange-800' },
+  negociacao: { chance: 75, badge: 'bg-amber-50 text-amber-800' },
+  fechado: { chance: 100, badge: 'bg-green-50 text-green-800' },
+  perdido: { chance: 0, badge: 'bg-rose-50 text-rose-800' },
+}
 
 export function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, onDragEnd }) {
   return (
@@ -172,10 +181,13 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
         {COLUMNS.map((stage) => {
           const meta = STAGE_META[stage]
           const items = byStage[stage]
+          const stageTotal = items.reduce((total, item) => total + effectiveValue(item), 0)
+          const columnMeta = COLUMN_META[stage]
           const isTarget = hoverColumn === stage
           return (
             <section
               key={stage}
+              aria-label={`Etapa ${meta.label}`}
               onDragOver={(e) => {
                 e.preventDefault()
                 e.dataTransfer.dropEffect = 'move'
@@ -190,10 +202,17 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
                 isTarget ? 'border-brand bg-brand/5' : 'border-line bg-surface2/40'
               }`}
             >
-              <header className="flex items-center gap-2 px-3.5 py-3">
-                <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${meta.dot}`} aria-hidden="true" />
-                <h2 className="text-[13px] font-semibold">{meta.label}</h2>
-                <span className="ml-auto text-[11.5px] text-ink3 tnum">{items.length}</span>
+              <header className="px-3.5 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${columnMeta.badge}`}>{meta.label}</h2>
+                  <span aria-label="Quantidade de oportunidades" className="text-[11.5px] text-ink2 tnum">{items.length}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 mt-2 text-[11.5px] tnum">
+                  <span aria-label="Valor da etapa" className="font-semibold">{formatBRL(stageTotal)}</span>
+                  <span className="text-ink2 whitespace-nowrap" title="Percentual comercial fixo por estágio">
+                    {columnMeta.chance}%{stage !== 'fechado' && stage !== 'perdido' ? ' de chance' : ''}
+                  </span>
+                </div>
               </header>
 
               <div className="flex flex-col gap-2 px-2.5 pb-2.5 flex-1 min-h-[120px]">
