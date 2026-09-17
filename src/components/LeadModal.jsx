@@ -4,7 +4,8 @@ import { X, Sparkles, Copy, Check, RefreshCw, MessagesSquare, UserCheck } from '
 import { ChannelBadge, StageBadge, STAGE_META } from './Badge'
 import EmptyState from './EmptyState'
 import OpportunityBusiness from './OpportunityBusiness'
-import { displayName, formatPhone } from '../format'
+import LeadContact from './LeadContact'
+import { displayName } from '../format'
 import { getLeadMessages, getLeadCoach, regenerateLeadCoach, assumirLead, atribuirResponsavel, removerResponsavel } from '../api'
 
 const MOVABLE = ['novo', 'qualificado', 'proposta', 'negociacao', 'fechado', 'perdido']
@@ -309,17 +310,11 @@ export default function LeadModal({ lead, usuario, vendedores = [], onClose, onM
             </header>
 
             <div className="px-6 py-5 space-y-5">
-              <h3 className="text-micro uppercase font-semibold text-ink3">Cliente</h3>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                <Field label="Nome" value={displayName(lead)} />
-                <Field label="Telefone" value={formatPhone(lead.phone)} />
-                <Field label="E-mail" value={lead.email} />
-                {lead.recordType !== 'opportunity' && <Field label="Veículo de interesse" value={lead.vehicleInterest || 'A confirmar'} />}
-                <Field
-                  label="Entrou em"
-                  value={lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('pt-BR') : null}
-                />
-              </div>
+              <LeadContact key={`${lead.id}:${lead.recordType || (lead.ownerId ? 'opportunity' : 'lead')}`} lead={lead} usuario={usuario} onLeadChanged={onLeadChanged} />
+              <Field
+                label="Entrou em"
+                value={lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('pt-BR') : null}
+              />
 
               <OwnerPanel lead={lead} usuario={usuario} vendedores={vendedores} onLeadChanged={onLeadChanged} />
               <section><h3 className="text-micro uppercase font-semibold text-ink3 mb-2">Origem</h3><p className="text-[13.5px]">{lead.origin || lead.channel || 'Não informado'}</p></section>
