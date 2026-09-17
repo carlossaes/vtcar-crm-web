@@ -5,6 +5,7 @@ import { StageBadge } from './Badge'
 import { createLead } from '../api'
 import CommercialFields from './CommercialFields'
 import { commercialPayload } from '../opportunity'
+import { formatPhoneInput, normalizePhoneInput, normalizeEmailInput, requiredText } from '../formInputs'
 
 // Lista fixa nesta entrega -- virar cadastro configuravel fica pra depois.
 export const ORIGENS = ['Webmotors', 'OLX', 'iCarros', 'Indicação', 'Loja', 'Telefone', 'Instagram', 'Outro']
@@ -48,13 +49,15 @@ export default function NovaOportunidadeModal({ open, usuario, vendedores = [], 
     try {
       const dados = {
         ...commercialPayload(form),
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim() || null,
-        vehicleInterest: form.vehicleInterest.trim() || null,
+        name: requiredText(form.name, 'Informe o nome do cliente.'),
+        phone: normalizePhoneInput(form.phone),
+        email: normalizeEmailInput(form.email),
+        vehicleInterest: requiredText(form.vehicleInterest, 'Informe o veículo de interesse.'),
         origin: form.origin,
         notes: form.notes.trim() || null,
       }
+      if (!form.origin) throw new Error('Selecione a origem.')
+      if (ehGerente && !form.ownerId) throw new Error('Selecione um vendedor responsável.')
       if (ehGerente) dados.ownerId = form.ownerId
       const lead = await createLead(dados)
       onCreated(lead)
@@ -135,9 +138,9 @@ export default function NovaOportunidadeModal({ open, usuario, vendedores = [], 
                   </div>
                 </div>
               ) : (
-                <form onSubmit={salvar} className="space-y-4">
+                <form noValidate onSubmit={salvar} className="space-y-4">
                   {erro && (
-                    <div className="flex items-start gap-2 text-[12.5px] text-critical bg-critical/10 border border-critical/25 rounded-control px-3 py-2.5">
+                    <div role="alert" className="flex items-start gap-2 text-[12.5px] text-critical bg-critical/10 border border-critical/25 rounded-control px-3 py-2.5">
                       <AlertTriangle size={14} className="shrink-0 mt-px" />
                       <span>{erro}</span>
                     </div>
@@ -152,7 +155,7 @@ export default function NovaOportunidadeModal({ open, usuario, vendedores = [], 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={label} htmlFor="op-telefone">Telefone *</label>
-                      <input id="op-telefone" required value={form.phone} onChange={mudar('phone')} className={campo} placeholder="(11) 98888-7777" />
+                      <input id="op-telefone" type="tel" required value={formatPhoneInput(form.phone)} onChange={mudar('phone')} className={campo} placeholder="(11) 98888-7777" />
                     </div>
                     <div>
                       <label className={label} htmlFor="op-email">E-mail</label>
