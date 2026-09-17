@@ -1,3 +1,6 @@
+import { parseCurrencyInput, parseInstallmentsInput } from './formInputs'
+export { formatBRL } from './formInputs'
+
 export const moneyFields = [
   ['assetValue', 'Valor do bem'], ['negotiatedValue', 'Valor negociado'],
   ['downPayment', 'Entrada'], ['financingAmount', 'Valor a financiar'],
@@ -10,8 +13,6 @@ export const payments = {
 }
 export const effectiveValue = (opportunity) => opportunity.negotiatedValue > 0
   ? opportunity.negotiatedValue : opportunity.assetValue > 0 ? opportunity.assetValue : 0
-const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-export const formatBRL = (value) => currency.format(value ?? 0)
 export function commercialPayload(form) {
   const result = {
     vehicleInterest: (form.vehicleInterest || '').trim(), notes: (form.notes || '').trim(),
@@ -19,7 +20,8 @@ export function commercialPayload(form) {
     tradeInVehicle: form.hasTradeIn ? (form.tradeInVehicle || '').trim() : '',
   }
   for (const [field] of [...moneyFields, ['tradeInValue']]) {
-    result[field] = form[field] === '' || form[field] == null ? null : Number(form[field])
+    if (field === 'tradeInValue' && !result.hasTradeIn) { result[field] = null; continue }
+    result[field] = field === 'installmentsCount' ? parseInstallmentsInput(form[field]) : parseCurrencyInput(form[field])
   }
   if (!result.hasTradeIn) result.tradeInValue = null
   return result
