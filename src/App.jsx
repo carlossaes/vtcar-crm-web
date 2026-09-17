@@ -205,13 +205,19 @@ export default function App() {
     setOportunidadeModalOpen(false)
   }, [])
 
-  // Telefone duplicado: fecha o formulario e abre o registro existente.
-  // O objeto que chega aqui e so o resumo devolvido pelo 409 (id, name,
-  // ownerName, stage) -- o LeadModal lida bem com campos ausentes, e
-  // messages/coach so carregam se o usuario tiver visibilidade sobre ele.
-  const handleAbrirExistente = useCallback((resumo) => {
+  // Carrega o registro completo e autorizado antes de permitir edição.
+  // O resumo do 409 não contém os valores comerciais nem o ownerId.
+  const handleAbrirExistente = useCallback(async (resumo) => {
     setOportunidadeModalOpen(false)
-    setLeadAberto(resumo)
+    try {
+      const atuais = await getLeads()
+      const existente = atuais.find((lead) => lead.id === resumo.id)
+      if (!existente) throw new Error('Este registro não está disponível na sua carteira. Solicite ao gerente.')
+      setLeadAberto(existente)
+    } catch (err) {
+      setMoveError(err.message)
+      setTimeout(() => setMoveError(null), 4000)
+    }
   }, [])
 
   // Leads e Pipeline nao sao mais duas visoes do mesmo conjunto -- os
