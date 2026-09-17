@@ -86,6 +86,10 @@ export function updateOpportunity(id, data) {
   return request(`/api/leads/${id}/comercial`, { method: 'PATCH', body: JSON.stringify(data) })
 }
 
+export function updateLeadData(id, data) {
+  return request(`/api/leads/${id}/lead-data`, { method: 'PATCH', body: JSON.stringify(data) })
+}
+
 export function updateLeadStage(id, stage) {
   return request(`/api/leads/${id}`, { method: 'PATCH', body: JSON.stringify({ stage }) })
 }
