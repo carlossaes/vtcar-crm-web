@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { updateLeadData } from '../api'
 import { formatPhone } from '../format'
+import { contactPayload, formatPhoneInput } from '../formInputs'
 
 const fields = [['name', 'Nome'], ['phone', 'Telefone'], ['email', 'E-mail'],
   ['vehicleInterest', 'Interesse inicial'], ['contactNotes', 'Observações do contato']]
@@ -27,7 +28,7 @@ export default function LeadContact({ lead, usuario, onLeadChanged }) {
     if (!canEdit || !editing || saving) return
     setSaving(true); setError('')
     try {
-      const data = Object.fromEntries(fields.map(([field]) => [field, (form[field] || '').trim()]))
+      const data = contactPayload(form, lead)
       const updated = await updateLeadData(lead.id, data)
       // A resposta de uma edição anterior não deve reabrir Lead após conversão.
       if (!active.current) return
@@ -37,14 +38,14 @@ export default function LeadContact({ lead, usuario, onLeadChanged }) {
   }
   return <section aria-label="Dados do contato" className="space-y-3">
     <h3 className="text-micro uppercase font-semibold text-ink3">Dados do contato</h3>
-    <form onSubmit={save} className="space-y-3">
+    <form noValidate onSubmit={save} className="space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {fields.map(([field, title]) => <div key={field} className={field === 'contactNotes' ? 'sm:col-span-2' : ''}>
           {editing && canEdit ? <label className="block text-[12px] text-ink2">{title}
             {field === 'contactNotes' ? <textarea aria-label={title} rows={3} className={control} disabled={saving}
               value={form[field] ?? ''} onChange={(e) => setForm((old) => ({ ...old, [field]: e.target.value }))} />
               : <input aria-label={title} className={control} type={field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
-                required={field === 'name' || field === 'phone'} disabled={saving} value={form[field] ?? ''}
+                required={field === 'name' || field === 'phone'} disabled={saving} value={field === 'phone' ? formatPhoneInput(form[field]) : form[field] ?? ''}
                 onChange={(e) => setForm((old) => ({ ...old, [field]: e.target.value }))} />}
           </label> : <><div className="text-[11.5px] text-ink3">{title}</div>
             <p className="text-[13.5px] whitespace-pre-wrap">{(field === 'phone' ? formatPhone(lead[field]) : lead[field]) || 'Não informado'}</p></>}
