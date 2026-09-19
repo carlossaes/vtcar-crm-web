@@ -30,14 +30,18 @@ export default function NovaOportunidadeModal({ open, usuario, vendedores = [], 
   const [erro, setErro] = useState(null)
   const [duplicado, setDuplicado] = useState(null)
   const ehGerente = usuario?.papel === 'gerente'
+  const responsaveis = [
+    ...(ehGerente && usuario.id && usuario.ativo !== false ? [usuario] : []),
+    ...vendedores.filter((v) => v.ativo !== false && v.papel === 'vendedor' && v.id !== usuario?.id),
+  ]
 
   useEffect(() => {
     if (open) {
-      setForm(ESTADO_INICIAL)
+      setForm({ ...ESTADO_INICIAL, ownerId: usuario?.id || '' })
       setErro(null)
       setDuplicado(null)
     }
-  }, [open])
+  }, [open, usuario?.id])
 
   const mudar = (campoNome) => (e) => setForm((f) => ({ ...f, [campoNome]: e.target.value }))
 
@@ -57,7 +61,7 @@ export default function NovaOportunidadeModal({ open, usuario, vendedores = [], 
         notes: form.notes.trim() || null,
       }
       if (!form.origin) throw new Error('Selecione a origem.')
-      if (ehGerente && !form.ownerId) throw new Error('Selecione um vendedor responsável.')
+      if (ehGerente && !form.ownerId) throw new Error('Selecione um responsável.')
       if (ehGerente) dados.ownerId = form.ownerId
       const lead = await createLead(dados)
       onCreated(lead)
@@ -187,8 +191,8 @@ export default function NovaOportunidadeModal({ open, usuario, vendedores = [], 
                         className={`${campo} pr-8`}
                         aria-label="Responsável comercial"
                       >
-                        <option value="" disabled>Selecione um vendedor…</option>
-                        {vendedores.filter((v) => v.ativo !== false && v.papel === 'vendedor').map((v) => (
+                        <option value="" disabled>Selecione um responsável…</option>
+                        {responsaveis.map((v) => (
                           <option key={v.id} value={v.id}>{v.nome}</option>
                         ))}
                       </select>
