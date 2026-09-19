@@ -90,8 +90,12 @@ export function updateLeadData(id, data) {
   return request(`/api/leads/${id}/lead-data`, { method: 'PATCH', body: JSON.stringify(data) })
 }
 
-export function updateLeadStage(id, stage) {
-  return request(`/api/leads/${id}`, { method: 'PATCH', body: JSON.stringify({ stage }) })
+export function updateLeadStage(id, stage, lostReason) {
+  return request(`/api/leads/${id}`, { method: 'PATCH', body: JSON.stringify({ stage, lostReason }) })
+}
+
+export function updateFollowUp(id, data) {
+  return request(`/api/leads/${id}/follow-up`, { method: 'PATCH', body: JSON.stringify(data) })
 }
 
 export function getLeadMessages(id) {
