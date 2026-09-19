@@ -5,6 +5,9 @@ import { ChannelBadge, StageBadge, STAGE_META } from './Badge'
 import EmptyState from './EmptyState'
 import OpportunityBusiness from './OpportunityBusiness'
 import LeadContact from './LeadContact'
+import OpportunityFollowUp from './OpportunityFollowUp'
+import useStageChange from './useStageChange'
+import { LOST_REASONS } from '../followUp'
 import { displayName } from '../format'
 import { getLeadMessages, getLeadCoach, regenerateLeadCoach, assumirLead, atribuirResponsavel, removerResponsavel } from '../api'
 
@@ -259,6 +262,7 @@ function CoachPanel({ leadId }) {
 
 export default function LeadModal({ lead, usuario, vendedores = [], onClose, onMoveStage, onLeadChanged }) {
   const [messages, setMessages] = useState([])
+  const { requestMove, lossDialog } = useStageChange(onMoveStage, lead?.id)
 
   useEffect(() => {
     if (!lead) return
@@ -273,7 +277,7 @@ export default function LeadModal({ lead, usuario, vendedores = [], onClose, onM
   }, [onClose])
 
   return (
-    <AnimatePresence>
+    <><AnimatePresence>
       {lead && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -319,6 +323,8 @@ export default function LeadModal({ lead, usuario, vendedores = [], onClose, onM
               <OwnerPanel lead={lead} usuario={usuario} vendedores={vendedores} onLeadChanged={onLeadChanged} />
               <section><h3 className="text-micro uppercase font-semibold text-ink3 mb-2">Origem</h3><p className="text-[13.5px]">{lead.origin || lead.channel || 'Não informado'}</p></section>
               {lead.recordType === 'opportunity' && <OpportunityBusiness key={lead.id} lead={lead} usuario={usuario} onLeadChanged={onLeadChanged} />}
+              {lead.recordType === 'opportunity' && <OpportunityFollowUp key={`follow-up:${lead.id}`} lead={lead} usuario={usuario} onLeadChanged={onLeadChanged} />}
+              {lead.stage === 'perdido' && <Field label="Motivo da perda" value={LOST_REASONS.find(([value]) => value === lead.lostReason)?.[1] || 'Não informado'} />}
 
               <div>
                 <h3 className="text-micro uppercase font-semibold text-ink3 mb-2">Pipeline</h3>
@@ -326,7 +332,7 @@ export default function LeadModal({ lead, usuario, vendedores = [], onClose, onM
                   {MOVABLE.filter((s) => s !== lead.stage).map((s) => (
                     <button
                       key={s}
-                      onClick={() => onMoveStage(lead.id, s)}
+                      onClick={() => requestMove(lead.id, s)}
                       className="flex items-center gap-1.5 border border-line bg-surface2 rounded-control px-3 py-1.5 text-[12.5px] font-medium text-ink2 hover:text-ink hover:border-lineStrong transition-colors"
                     >
                       <span className={`w-[7px] h-[7px] rounded-full ${STAGE_META[s].dot}`} aria-hidden="true" />
@@ -361,6 +367,6 @@ export default function LeadModal({ lead, usuario, vendedores = [], onClose, onM
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>{lead && lossDialog}</>
   )
 }
