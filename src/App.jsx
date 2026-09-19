@@ -178,17 +178,19 @@ export default function App() {
 
   // Move otimista: o card muda de coluna na hora e so depois confirma com a
   // API. Se o backend recusar, volta pro estado anterior e avisa.
-  const handleMoveStage = async (id, stage) => {
+  const handleMoveStage = async (id, stage, lostReason) => {
     const previous = leads
     setLeads((current) => current.map((l) => (l.id === id ? { ...l, stage } : l)))
     try {
-      await updateLeadStage(id, stage)
-      refreshLeads()
+      const updated = await updateLeadStage(id, stage, lostReason)
+      setLeads((current) => current.map((lead) => lead.id === id ? updated : lead))
+      return true
     } catch (err) {
       console.warn('Falha ao mover o lead:', err)
       setLeads(previous)
       setMoveError('Não deu pra salvar a mudança de estágio. O card voltou pro lugar.')
       setTimeout(() => setMoveError(null), 4000)
+      return false
     }
   }
 
@@ -342,9 +344,10 @@ export default function App() {
         usuario={usuario}
         vendedores={equipe}
         onClose={() => setLeadAberto(null)}
-        onMoveStage={async (id, stage) => {
-          await handleMoveStage(id, stage)
-          setLeadAberto(null)
+        onMoveStage={async (id, stage, reason) => {
+          const result = await handleMoveStage(id, stage, reason)
+          if (result !== false) setLeadAberto(null)
+          return result
         }}
         onLeadChanged={(atualizado) => {
           handleLeadChanged(atualizado)
