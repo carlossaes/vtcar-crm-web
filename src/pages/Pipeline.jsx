@@ -5,7 +5,7 @@ import { ChannelBadge, STAGE_META } from '../components/Badge'
 import { displayName, formatPhone, quandoEntrou } from '../format'
 import LeadModal from '../components/LeadModal'
 import { effectiveValue, formatBRL, pipelineIndicators } from '../opportunity'
-import { followUpCardText, followUpIndicators } from '../followUp'
+import { followUpPresentation, followUpIndicators, STATUS_LABEL } from '../followUp'
 import useNow from '../useNow'
 import useStageChange from '../components/useStageChange'
 
@@ -22,6 +22,7 @@ const COLUMN_META = {
 }
 
 export function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, onDragEnd, now }) {
+  const followUp = followUpPresentation(lead, now)
   return (
     <motion.article
       layout
@@ -64,7 +65,10 @@ export function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, 
         <div className="text-[11px] text-ink3"><div>Bem: {formatBRL(lead.assetValue)}</div><div>Negociado: {formatBRL(lead.negotiatedValue)}</div></div>
       )}
       {lead.hasTradeIn && <div className="text-[11.5px] text-brand mt-1">Com troca</div>}
-      <div className="text-[11.5px] text-ink2 mt-1 truncate">{followUpCardText(lead, now)}</div>
+      <div className={`text-[11.5px] mt-1 ${followUp.textClass}`}>
+        <span className={`inline-block max-w-full rounded-control border px-1.5 py-0.5 ${followUp.badgeClass}`}>{followUp.label}</span>
+        {followUp.detail && <div className="text-[11px] mt-0.5">{followUp.detail}</div>}
+      </div>
       <div className="flex items-center justify-between gap-2 mt-2.5">
         <ChannelBadge channel={lead.origin || lead.channel} />
         <span className="text-[11.5px] text-ink3 tnum shrink-0">{quandoEntrou(lead.createdAt)}</span>
@@ -156,7 +160,7 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
       <div aria-label="Indicadores de follow-up" className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
         {[
           ['Follow-ups hoje', followUps.HOJE], ['Atrasados', followUps.ATRASADO],
-          ['Sem próximo passo', followUps.SEM_PRÓXIMO_PASSO], ['Tempo médio até assumir', followUps.average],
+          [STATUS_LABEL.SEM_PRÓXIMO_PASSO, followUps.SEM_PRÓXIMO_PASSO], ['Tempo médio até assumir', followUps.average],
         ].map(([title, value]) => <section key={title} aria-label={title} className="bg-surface border border-line rounded-card p-3">
           <h2 className="text-micro uppercase text-ink3 font-semibold">{title}</h2><div className="text-[19px] font-bold tnum">{value}</div>
         </section>)}

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Check, Pencil, ArrowUpRight, ClipboardList } from 'lucide-react'
 import { displayName } from '../format'
-import { followUpStatus, followUpTime } from '../followUp'
+import { followUpPresentation, followUpTime } from '../followUp'
 import { filterTasks, visibleOpportunities, TASK_PERIODS, TASK_TYPES, TASK_PRIORITIES, TASK_STATUSES, taskDate, taskDateTime } from '../tasks'
 import useNow from '../useNow'
 import LeadModal from '../components/LeadModal'
@@ -71,7 +71,7 @@ export default function Tasks({ leads, usuario, vendedores = [], search = '', on
           </tr></thead>
           <tbody className="divide-y divide-line">
             {tasks.map((task) => {
-              const status = followUpStatus(task, now)
+              const visual = followUpPresentation(task, now)
               const completed = task.taskStatus === 'concluida'
               return <tr key={task.id} className="hover:bg-surface2/30 align-top">
                 <td className="px-4 py-4 min-w-[190px] max-w-[280px]">
@@ -81,12 +81,11 @@ export default function Tasks({ leads, usuario, vendedores = [], search = '', on
                 <td className="px-4 py-4 min-w-[150px] text-[12.5px]"><div>{displayName(task)}</div><div className="text-ink3 mt-1">{task.vehicleInterest || 'Veículo a confirmar'}</div></td>
                 <td className="px-4 py-4 text-[12px] whitespace-nowrap">{TASK_TYPES[task.taskType]}</td>
                 <td className="px-4 py-4"><span className={`rounded-full border px-2 py-0.5 text-[11.5px] whitespace-nowrap ${task.taskPriority === 'urgente' ? 'border-critical/30 bg-critical/10 text-critical font-semibold' : task.taskPriority === 'alta' ? 'border-brand/25 text-brand' : 'border-line text-ink2'}`}>{TASK_PRIORITIES[task.taskPriority]}</span></td>
-                <td className="px-4 py-4 text-[12px] whitespace-nowrap tnum"><div>{taskDate(task.nextFollowUpAt)}</div><div className="text-ink3">{followUpTime(task.nextFollowUpAt)}</div>
-                  {!completed && status === 'ATRASADO' && <div className="text-critical text-[11px] font-medium mt-1">Atrasada</div>}
-                  {!completed && status === 'HOJE' && <div className="text-brand text-[11px] mt-1">Hoje</div>}
+                <td className={`px-4 py-4 text-[12px] whitespace-nowrap tnum ${visual.textClass}`}><div>{taskDate(task.nextFollowUpAt)}</div><div>{followUpTime(task.nextFollowUpAt)}</div>
+                  {visual.dueLabel && <div className="text-[11px] font-medium mt-1">{visual.dueLabel}</div>}
                 </td>
-                <td className="px-4 py-4 text-[12px]"><span className="rounded-full border border-line px-2 py-0.5 whitespace-nowrap">{TASK_STATUSES[task.taskStatus]}</span>
-                  {completed && taskDateTime(task.taskCompletedAt) && <div className="text-[11px] text-ink3 mt-2">Concluída em {taskDateTime(task.taskCompletedAt)}</div>}
+                <td className="px-4 py-4 text-[12px]"><span className={`rounded-full border px-2 py-0.5 whitespace-nowrap ${visual.textClass} ${visual.badgeClass}`}>{TASK_STATUSES[task.taskStatus]}</span>
+                  {completed && taskDateTime(task.taskCompletedAt) && <div className={`text-[11px] mt-2 ${visual.textClass}`}>Concluída em {taskDateTime(task.taskCompletedAt)}</div>}
                 </td>
                 <td className="px-4 py-4 text-[12px]">{task.ownerName || owners.find(([id]) => id === task.ownerId)?.[1] || 'Não informado'}</td>
                 <td className="px-4 py-4"><div className="flex flex-wrap gap-1.5">

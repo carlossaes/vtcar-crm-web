@@ -5,7 +5,15 @@ export const LOST_REASONS = [
   ['veiculo_indisponivel', 'Veículo indisponível'], ['troca_nao_aprovada', 'Troca não aprovada'],
   ['sem_retorno', 'Sem retorno'], ['contato_invalido', 'Contato inválido'], ['outro', 'Outro'],
 ]
-export const STATUS_LABEL = { SEM_PRÓXIMO_PASSO: 'Sem próximo passo', HOJE: 'Hoje', ATRASADO: 'Atrasado', FUTURO: 'Próximo' }
+export const STATUS_LABEL = { SEM_PRÓXIMO_PASSO: 'Sem próxima ação', HOJE: 'Hoje', ATRASADO: 'Atrasada', FUTURO: 'Próxima', CONCLUIDA: 'Concluída' }
+const ATTENTION_STYLE = { textClass: 'text-amber-700 dark:text-amber-400', badgeClass: 'border-amber-500/30 bg-amber-500/5' }
+const FOLLOW_UP_STYLE = {
+  ATRASADO: { textClass: 'text-critical', badgeClass: 'border-critical/30 bg-critical/5' },
+  HOJE: ATTENTION_STYLE,
+  FUTURO: { textClass: 'text-slate-600 dark:text-slate-300', badgeClass: 'border-slate-400/30 bg-slate-500/5' },
+  CONCLUIDA: { textClass: 'text-green-700 dark:text-green-400', badgeClass: 'border-green-500/30 bg-green-500/5' },
+  SEM_PRÓXIMO_PASSO: ATTENTION_STYLE,
+}
 const dateValue = (value) => value ? new Date(value).getTime() : NaN
 const dayKey = (value) => new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value))
 
@@ -23,13 +31,30 @@ export function followUpDate(value) {
   return new Date(value).toLocaleDateString('pt-BR', { timeZone: TIME_ZONE, day: '2-digit', month: '2-digit' })
 }
 export function followUpCardText(lead, now = Date.now()) {
-  if (lead.taskStatus === 'concluida') return 'Follow-up concluído'
-  switch (followUpStatus(lead, now)) {
-    case 'ATRASADO': return 'Follow-up atrasado'
-    case 'HOJE': return `Follow-up hoje às ${followUpTime(lead.nextFollowUpAt)}`
-    case 'FUTURO': return `Próximo: ${followUpDate(lead.nextFollowUpAt)} às ${followUpTime(lead.nextFollowUpAt)}`
-    default: return 'Sem próximo passo'
+  return followUpPresentation(lead, now).label
+}
+
+// Presentation only: the temporal classifier and indicator calculations stay unchanged.
+export function followUpPresentation(lead, now = Date.now()) {
+  const status = lead.taskStatus === 'concluida' ? 'CONCLUIDA' : followUpStatus(lead, now)
+  let label = STATUS_LABEL[status]
+  let detail = ''
+  if (status === 'ATRASADO') {
+    label = 'Follow-up atrasado'
+    const hours = Math.floor((Number(now) - dateValue(lead.nextFollowUpAt)) / 3600000)
+    const days = Math.floor(hours / 24)
+    detail = days > 0 ? `há ${days} ${days === 1 ? 'dia' : 'dias'}`
+      : hours > 0 ? `há ${hours} ${hours === 1 ? 'hora' : 'horas'}` : 'há menos de 1 hora'
+  } else if (status === 'HOJE') {
+    label = `Follow-up hoje às ${followUpTime(lead.nextFollowUpAt)}`
+  } else if (status === 'FUTURO') {
+    label = `Próximo: ${followUpDate(lead.nextFollowUpAt)} às ${followUpTime(lead.nextFollowUpAt)}`
+  } else if (status === 'CONCLUIDA') {
+    label = 'Follow-up concluído'
   }
+  return { status, label, detail, ...FOLLOW_UP_STYLE[status],
+    dueLabel: status === 'ATRASADO' || status === 'HOJE' ? STATUS_LABEL[status] : '',
+    actionLabel: status === 'SEM_PRÓXIMO_PASSO' ? 'Definir ação' : 'Editar follow-up' }
 }
 
 export function followUpIndicators(leads, now = Date.now()) {
