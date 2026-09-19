@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { UserCircle, Car, Activity, BarChart3, Hammer, AlertTriangle } from 'lucide-react'
+import { UserCircle, Car, BarChart3, Hammer, AlertTriangle } from 'lucide-react'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import BackendModal from './components/BackendModal'
@@ -7,6 +7,7 @@ import EmptyState from './components/EmptyState'
 import Dashboard from './pages/Dashboard'
 import Leads from './pages/Leads'
 import Pipeline from './pages/Pipeline'
+import Tasks from './pages/Tasks'
 import Contatos from './pages/Contatos'
 import Usuarios from './pages/Usuarios'
 import Login from './pages/Login'
@@ -40,12 +41,7 @@ const PAGES = {
     icon: Car,
     soon: 'Cadastro do estoque e vínculo entre o interesse do lead e o carro real.',
   },
-  atividades: {
-    title: 'Atividades',
-    subtitle: 'Follow-ups e tarefas',
-    icon: Activity,
-    soon: 'Agenda de retornos, lembretes e o que cada vendedor precisa fazer hoje.',
-  },
+  tarefas: { title: 'Tarefas', subtitle: 'Próximos passos da sua carteira comercial' },
   relatorios: {
     title: 'Relatórios',
     subtitle: 'Números da operação',
@@ -296,6 +292,8 @@ export default function App() {
             />
           )}
           {page === 'contatos' && <Contatos search={search} usuario={usuario} />}
+          {page === 'tarefas' && <Tasks leads={leads} usuario={usuario} vendedores={equipe} search={search} onClearSearch={() => setSearch('')}
+            onLeadChanged={handleLeadChanged} onMoveStage={handleMoveStage} />}
           {paginaAtual === 'usuarios' && <Usuarios usuarioAtual={usuario} />}
           {meta.soon && (
             <div className="bg-surface border border-line rounded-card shadow-card">

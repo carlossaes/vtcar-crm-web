@@ -23,6 +23,7 @@ export function followUpDate(value) {
   return new Date(value).toLocaleDateString('pt-BR', { timeZone: TIME_ZONE, day: '2-digit', month: '2-digit' })
 }
 export function followUpCardText(lead, now = Date.now()) {
+  if (lead.taskStatus === 'concluida') return 'Follow-up concluído'
   switch (followUpStatus(lead, now)) {
     case 'ATRASADO': return 'Follow-up atrasado'
     case 'HOJE': return `Follow-up hoje às ${followUpTime(lead.nextFollowUpAt)}`
@@ -35,7 +36,7 @@ export function followUpIndicators(leads, now = Date.now()) {
   const result = { HOJE: 0, ATRASADO: 0, SEM_PRÓXIMO_PASSO: 0, FUTURO: 0, average: '' }
   const durations = []
   for (const lead of leads) {
-    result[followUpStatus(lead, now)]++
+    if (lead.taskStatus !== 'concluida') result[followUpStatus(lead, now)]++
     const duration = dateValue(lead.firstHumanActionAt) - dateValue(lead.createdAt)
     if (Number.isFinite(duration) && duration >= 0) durations.push(duration)
   }

@@ -1,4 +1,4 @@
-import { LayoutGrid, GitBranch, Users2, UserCircle, Car, Activity, BarChart3, MessagesSquare, ShieldCheck, LogOut } from 'lucide-react'
+import { LayoutGrid, GitBranch, Users2, UserCircle, Car, ClipboardList, BarChart3, MessagesSquare, ShieldCheck, LogOut } from 'lucide-react'
 
 const NAV_SECTIONS = [
   { title: 'Principal', items: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutGrid }] },
@@ -15,7 +15,7 @@ const NAV_SECTIONS = [
   {
     title: 'Gestão',
     items: [
-      { id: 'atividades', label: 'Atividades', icon: Activity },
+      { id: 'tarefas', label: 'Tarefas', icon: ClipboardList },
       { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
       // Só aparece para gerente — quem administra quem tem acesso.
       { id: 'usuarios', label: 'Usuários', icon: ShieldCheck, soGerente: true },

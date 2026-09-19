@@ -98,6 +98,10 @@ export function updateFollowUp(id, data) {
   return request(`/api/leads/${id}/follow-up`, { method: 'PATCH', body: JSON.stringify(data) })
 }
 
+export function completeTask(id) {
+  return request(`/api/leads/${id}/task/complete`, { method: 'PATCH', body: JSON.stringify({}) })
+}
+
 export function getLeadMessages(id) {
   return request(`/api/leads/${id}/messages`)
 }
