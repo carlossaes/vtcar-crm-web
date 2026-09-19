@@ -5,6 +5,9 @@ import { ChannelBadge, STAGE_META } from '../components/Badge'
 import { displayName, formatPhone, quandoEntrou } from '../format'
 import LeadModal from '../components/LeadModal'
 import { effectiveValue, formatBRL, pipelineIndicators } from '../opportunity'
+import { followUpCardText, followUpIndicators } from '../followUp'
+import useNow from '../useNow'
+import useStageChange from '../components/useStageChange'
 
 // O funil inteiro, incluindo as duas saidas (fechado e perdido).
 const COLUMNS = ['novo', 'qualificado', 'proposta', 'negociacao', 'fechado', 'perdido']
@@ -18,7 +21,7 @@ const COLUMN_META = {
   perdido: { chance: 0, badge: 'bg-rose-50 text-rose-800' },
 }
 
-export function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, onDragEnd }) {
+export function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, onDragEnd, now }) {
   return (
     <motion.article
       layout
@@ -61,6 +64,7 @@ export function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, 
         <div className="text-[11px] text-ink3"><div>Bem: {formatBRL(lead.assetValue)}</div><div>Negociado: {formatBRL(lead.negotiatedValue)}</div></div>
       )}
       {lead.hasTradeIn && <div className="text-[11.5px] text-brand mt-1">Com troca</div>}
+      <div className="text-[11.5px] text-ink2 mt-1 truncate">{followUpCardText(lead, now)}</div>
       <div className="flex items-center justify-between gap-2 mt-2.5">
         <ChannelBadge channel={lead.origin || lead.channel} />
         <span className="text-[11.5px] text-ink3 tnum shrink-0">{quandoEntrou(lead.createdAt)}</span>
@@ -82,6 +86,8 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
   const [hoverColumn, setHoverColumn] = useState(null)
   const [ownerFilter, setOwnerFilter] = useState('todos')
   const ehGerente = usuario?.papel === 'gerente'
+  const now = useNow()
+  const { requestMove, lossDialog } = useStageChange(onMoveStage)
 
   const filtered = useMemo(() => {
     // Pipeline e a carteira comercial: so oportunidade entra aqui. Lead
@@ -119,6 +125,7 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
     return map
   }, [filtered])
   const indicators = useMemo(() => pipelineIndicators(filtered), [filtered])
+  const followUps = followUpIndicators(filtered, now)
 
   const handleDragStart = (e, lead) => {
     setDraggingId(lead.id)
@@ -134,17 +141,26 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
     setHoverColumn(null)
     if (!id) return
     const lead = leads.find((l) => l.id === id)
-    if (lead && lead.stage !== stage) onMoveStage(id, stage)
+    if (lead && lead.stage !== stage) requestMove(id, stage)
   }
 
   const moveRelative = (lead, delta) => {
     const index = COLUMNS.indexOf(lead.stage)
     const next = COLUMNS[index + delta]
-    if (next) onMoveStage(lead.id, next)
+    if (next) requestMove(lead.id, next)
   }
 
   return (
     <>
+      {lossDialog}
+      <div aria-label="Indicadores de follow-up" className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+        {[
+          ['Follow-ups hoje', followUps.HOJE], ['Atrasados', followUps.ATRASADO],
+          ['Sem próximo passo', followUps.SEM_PRÓXIMO_PASSO], ['Tempo médio até assumir', followUps.average],
+        ].map(([title, value]) => <section key={title} aria-label={title} className="bg-surface border border-line rounded-card p-3">
+          <h2 className="text-micro uppercase text-ink3 font-semibold">{title}</h2><div className="text-[19px] font-bold tnum">{value}</div>
+        </section>)}
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-4" aria-label="Indicadores financeiros">
         {[
           ['Pipeline aberto', formatBRL(indicators.openValue), `${indicators.openCount} oportunidades abertas`],
@@ -221,6 +237,7 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
                     <LeadCard
                       key={lead.id}
                       lead={lead}
+                      now={now}
                       dragging={draggingId === lead.id}
                       onOpen={setSelected}
                       onMoveRelative={moveRelative}
@@ -264,9 +281,10 @@ export default function Pipeline({ leads, search, usuario, vendedores = [], onMo
         usuario={usuario}
         vendedores={vendedores}
         onClose={() => setSelected(null)}
-        onMoveStage={async (id, stage) => {
-          await onMoveStage(id, stage)
-          setSelected(null)
+        onMoveStage={async (id, stage, reason) => {
+          const result = await onMoveStage(id, stage, reason)
+          if (result !== false) setSelected(null)
+          return result
         }}
         onLeadChanged={(atualizado) => {
           onLeadChanged(atualizado)
