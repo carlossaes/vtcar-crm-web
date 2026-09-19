@@ -148,9 +148,10 @@ export default function Leads({ leads, search, usuario, vendedores = [], onMoveS
         usuario={usuario}
         vendedores={vendedores}
         onClose={() => setSelected(null)}
-        onMoveStage={async (id, stage) => {
-          await onMoveStage(id, stage)
-          setSelected(null)
+        onMoveStage={async (id, stage, reason) => {
+          const result = await onMoveStage(id, stage, reason)
+          if (result !== false) setSelected(null)
+          return result
         }}
         onLeadChanged={(atualizado) => {
           onLeadChanged(atualizado)
