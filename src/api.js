@@ -102,6 +102,35 @@ export function completeTask(id) {
   return request(`/api/leads/${id}/task/complete`, { method: 'PATCH', body: JSON.stringify({}) })
 }
 
+// --- Financiamento (Zinix) ---------------------------------------------
+// O navegador fala SOMENTE com o backend VT Car. A chave da Zinix nunca
+// chega aqui; o backend faz a ponte, valida permissão e guarda a intenção.
+const q = (params) => new URLSearchParams(params).toString()
+
+export function getFinanciamentoMarcas(tipo) {
+  return request(`/api/financiamento/veiculos/marcas?${q({ tipo })}`)
+}
+
+export function getFinanciamentoModelos(tipo, marca) {
+  return request(`/api/financiamento/veiculos/modelos?${q({ tipo, marca })}`)
+}
+
+export function getFinanciamentoVersoes(tipo, marca, modelo, anoFabricacao, anoModelo) {
+  return request(`/api/financiamento/veiculos/versoes?${q({ tipo, marca, modelo, anoFabricacao, anoModelo })}`)
+}
+
+export function criarSimulacaoFinanciamento(dados) {
+  return request('/api/financiamento/simulacoes', { method: 'POST', body: JSON.stringify(dados) })
+}
+
+export function getSimulacaoFinanciamento(id) {
+  return request(`/api/financiamento/simulacoes/${encodeURIComponent(id)}`)
+}
+
+export function listarSimulacoesFinanciamento(opportunityId) {
+  return request(`/api/financiamento/oportunidades/${encodeURIComponent(opportunityId)}/simulacoes`)
+}
+
 export function getLeadMessages(id) {
   return request(`/api/leads/${id}/messages`)
 }

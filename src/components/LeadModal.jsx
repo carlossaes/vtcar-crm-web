@@ -6,6 +6,7 @@ import EmptyState from './EmptyState'
 import OpportunityBusiness from './OpportunityBusiness'
 import LeadContact from './LeadContact'
 import OpportunityFollowUp from './OpportunityFollowUp'
+import OpportunityFinancing from './OpportunityFinancing'
 import useStageChange from './useStageChange'
 import { LOST_REASONS } from '../followUp'
 import { displayName } from '../format'
@@ -324,6 +325,7 @@ export default function LeadModal({ lead, usuario, vendedores = [], onClose, onM
               <section><h3 className="text-micro uppercase font-semibold text-ink3 mb-2">Origem</h3><p className="text-[13.5px]">{lead.origin || lead.channel || 'Não informado'}</p></section>
               {lead.recordType === 'opportunity' && <OpportunityBusiness key={lead.id} lead={lead} usuario={usuario} onLeadChanged={onLeadChanged} />}
               {lead.recordType === 'opportunity' && <OpportunityFollowUp key={`follow-up:${lead.id}`} lead={lead} usuario={usuario} onLeadChanged={onLeadChanged} />}
+              {lead.recordType === 'opportunity' && <OpportunityFinancing key={`financiamento:${lead.id}`} lead={lead} usuario={usuario} />}
               {lead.stage === 'perdido' && <Field label="Motivo da perda" value={LOST_REASONS.find(([value]) => value === lead.lostReason)?.[1] || 'Não informado'} />}
 
               <div>
