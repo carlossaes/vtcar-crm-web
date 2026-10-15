@@ -723,6 +723,57 @@ describe('segurança, LGPD e layout', () => {
   })
 })
 
+describe('ZINIX-MVP-002B: frontend nunca depende do CPF completo', () => {
+  const src = (f) => fs.readFileSync(path.resolve(__dirname, '../src', f), 'utf8')
+  it('código do frontend só conhece customerDocumentMasked (nunca customerDocument)', () => {
+    const codigo = ['components/OpportunityFinancing.jsx', 'financing.js', 'api.js', 'components/LeadModal.jsx'].map(src).join('\n')
+    expect(codigo).not.toMatch(/customerDocument(?!Masked)/)
+  })
+  it('editar CPF: campo abre vazio, a máscara nunca vira valor e sem digitar o CPF não é enviado', async () => {
+    await abrir(vendedor, leadCompleto)
+    fireEvent.click(screen.getByRole('button', { name: 'Editar dados do cliente' }))
+    expect(screen.getByLabelText('CPF')).toHaveValue('')
+    expect(rascunhoCliente(leadCompleto).cpf).toBe('')
+    fireEvent.click(within(screen.getByRole('group', { name: 'Possui CNH' })).getByRole('button', { name: 'Não' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar dados do cliente' }))
+    await waitFor(() => expect(api.salvarClienteFinanciamento).toHaveBeenCalledWith('opp1', { hasDriverLicense: false }))
+    // salvar outro campo não limpa o CPF: continua o mascarado do cadastro
+    expect(await within(screen.getByRole('list', { name: 'Dados do cliente' })).findByText('•••.•••.•••-25')).toBeInTheDocument()
+    expect(screen.getByLabelText('Completude')).toHaveTextContent('9 de 9 ok')
+  })
+  it('trocar o CPF exige digitar o número inteiro; só então ele é enviado', async () => {
+    await abrir(vendedor, leadCompleto)
+    fireEvent.click(screen.getByRole('button', { name: 'Editar dados do cliente' }))
+    fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '25' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar dados do cliente' }))
+    expect(await screen.findByText('Informe um CPF válido.')).toBeInTheDocument()
+    expect(api.salvarClienteFinanciamento).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '111.444.777-35' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar dados do cliente' }))
+    await waitFor(() => expect(api.salvarClienteFinanciamento).toHaveBeenCalledWith('opp1', { document: '11144477735' }))
+    expect(await within(screen.getByRole('list', { name: 'Dados do cliente' })).findByText('•••.•••.•••-35')).toBeInTheDocument()
+  })
+  it('oportunidade sem responsável vista por vendedor (API omite os dados): nada pessoal na tela e sem Financiamento', () => {
+    const restrita = { ...lead, ownerId: null, ownerName: null, ...VEICULO, customerDataRestricted: true }
+    render(<LeadModal lead={restrita} usuario={vendedor} onClose={() => {}} onMoveStage={() => {}} onLeadChanged={() => {}} />)
+    expect(screen.queryByRole('region', { name: 'Financiamento' })).not.toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/•••|20\/05\/1990|Londrina/)
+  })
+  it('gerente e vendedor responsável veem o necessário (CPF só mascarado)', async () => {
+    for (const quem of [gerente, vendedor]) {
+      const { unmount } = await abrir(quem, leadCompleto)
+      const dados = screen.getByRole('list', { name: 'Dados do cliente' })
+      expect(dados).toHaveTextContent('•••.•••.•••-25'); expect(dados).toHaveTextContent('20/05/1990'); expect(dados).toHaveTextContent('Londrina')
+      expect(document.body.textContent).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}|\d{11}/)
+      unmount()
+    }
+  })
+  it('gerente abre oportunidade sem responsável com os dados (como a API entrega ao gerente)', async () => {
+    await abrir(gerente, { ...leadCompleto, ownerId: null, ownerName: null })
+    expect(screen.getByLabelText('Completude')).toHaveTextContent('9 de 9 ok')
+  })
+})
+
 describe('integração com a oportunidade', () => {
   it('LeadModal repassa onLeadChanged: salvar o cadastro atualiza a oportunidade no App', async () => {
     const onLeadChanged = vi.fn()
