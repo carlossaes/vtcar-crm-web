@@ -80,33 +80,82 @@ export function formularioInicial(lead) {
   const prazoDoNegocio = Number.isSafeInteger(lead?.installmentsCount) && lead.installmentsCount >= 1 && lead.installmentsCount <= 84 ? lead.installmentsCount : null
   const prazos = [24, 36, 48, 60]
   if (prazoDoNegocio && !prazos.includes(prazoDoNegocio)) prazos.push(prazoDoNegocio)
+  const temVeiculo = lead?.vehicleVersionCode != null
   return {
-    // Cliente: CRM primeiro; o resto só existe nesta simulação.
+    // Nome/telefone/e-mail: do CRM (correção pontual vale só para a simulação).
     name: crm.name, phone: crm.phone ? formatPhone(crm.phone) || crm.phone : '', email: crm.email,
-    cpf: '', birthDate: '', gender: '', state: '', city: '', hasDriverLicense: '',
-    // Veículo: identificação no catálogo Zinix do MESMO veículo de interesse.
-    type: 'car', brandCode: '', modelCode: '', manufactureYear: '', modelYear: '', versionCode: '', zeroKm: false,
+    // Veículo: a estrutura técnica salva na oportunidade (ou vazio para identificar).
+    type: temVeiculo && ['car', 'motorcycle'].includes(lead.vehicleType) ? lead.vehicleType : 'car',
+    brandCode: temVeiculo ? String(lead.vehicleBrandCode || '') : '', modelCode: temVeiculo ? String(lead.vehicleModelCode || '') : '',
+    manufactureYear: temVeiculo ? lead.vehicleManufactureYear || '' : '', modelYear: temVeiculo ? lead.vehicleModelYear || '' : '',
+    versionCode: temVeiculo ? String(lead.vehicleVersionCode || '') : '', zeroKm: temVeiculo ? lead.vehicleZeroKm === true : false,
     // Negociação: da oportunidade.
     valor: valorDaSimulacao(lead).valor, downPayment: lead?.downPayment ?? null, installments: prazos.sort((a, b) => a - b),
   }
 }
 
-// Checklist de completude da etapa Cliente. `origem: 'crm'` = já veio do CRM.
+// --- ZINIX-MVP-002A: dados do cliente gravados no CRM -------------------------
+// O CPF nunca volta inteiro do servidor: o CRM só mostra o mascarado.
+const NOMES_SEXO = { male: 'Masculino', female: 'Feminino' }
+export const CAMPOS_CADASTRO = ['cpf', 'birthDate', 'gender', 'state', 'city', 'hasDriverLicense']
+
+// Checklist da etapa Cliente. origem: 'crm' (nome/telefone/e-mail do CRM),
+// 'simulacao' (nome/telefone/e-mail informados só para esta simulação) ou
+// 'cadastro' (dados do cliente salvos no registro da oportunidade).
 export function checklistCliente(form, lead, hoje = new Date()) {
   const crm = dadosDoCrm(lead)
-  const anos = idade(form.birthDate, hoje)
+  const anos = idade(lead?.customerBirthDate, hoje)
+  const cnh = lead?.customerHasDriverLicense
   const itens = [
-    ['name', 'Nome', (form.name || '').trim().replace(/\s+/g, ' ').length >= 3, 'Informe o nome completo do cliente.', !!crm.name],
-    ['phone', 'Telefone', telefoneValido(form.phone), 'Informe um telefone com DDD.', !!crm.phone],
-    ['email', 'E-mail', EMAIL.test((form.email || '').trim()), 'Informe um e-mail válido.', !!crm.email],
-    ['cpf', 'CPF', cpfValido(form.cpf), 'Informe um CPF válido.', false],
-    ['birthDate', 'Data de nascimento', anos !== null && anos >= 18 && anos <= 100, anos === null ? 'Informe a data de nascimento.' : 'O cliente precisa ter entre 18 e 100 anos.', false],
-    ['gender', 'Sexo', ['male', 'female'].includes(form.gender), 'Selecione o sexo.', false],
-    ['state', 'UF', UFS.includes(form.state), 'Selecione a UF.', false],
-    ['city', 'Cidade', (form.city || '').trim().length >= 2, 'Informe a cidade.', false],
-    ['hasDriverLicense', 'Possui CNH', ['sim', 'nao'].includes(form.hasDriverLicense), 'Informe se possui CNH.', false],
+    ['name', 'Nome', (form.name || '').trim().replace(/\s+/g, ' ').length >= 3, 'Informe o nome completo do cliente.', crm.name ? 'crm' : 'simulacao', form.name],
+    ['phone', 'Telefone', telefoneValido(form.phone), 'Informe um telefone com DDD.', crm.phone ? 'crm' : 'simulacao', form.phone],
+    ['email', 'E-mail', EMAIL.test((form.email || '').trim()), 'Informe um e-mail válido.', crm.email ? 'crm' : 'simulacao', form.email],
+    ['cpf', 'CPF', !!lead?.customerDocumentMasked, 'Informe o CPF.', 'cadastro', lead?.customerDocumentMasked],
+    ['birthDate', 'Nascimento', anos !== null && anos >= 18 && anos <= 100, 'Informe a data de nascimento.', 'cadastro', formatData(lead?.customerBirthDate)],
+    ['gender', 'Sexo', !!NOMES_SEXO[lead?.customerGender], 'Selecione o sexo.', 'cadastro', NOMES_SEXO[lead?.customerGender]],
+    ['state', 'UF', UFS.includes(lead?.customerState), 'Selecione a UF.', 'cadastro', lead?.customerState],
+    ['city', 'Cidade', (lead?.customerCity || '').trim().length >= 2, 'Informe a cidade.', 'cadastro', lead?.customerCity],
+    ['hasDriverLicense', 'CNH', typeof cnh === 'boolean', 'Informe se possui CNH.', 'cadastro', typeof cnh === 'boolean' ? (cnh ? 'Possui' : 'Não possui') : ''],
   ]
-  return itens.map(([campo, label, ok, erro, doCrm]) => ({ campo, label, ok, erro, origem: doCrm ? 'crm' : 'simulacao' }))
+  return itens.map(([campo, label, ok, erro, origem, valor]) => ({ campo, label, ok, erro, origem, valor: ok ? valor : '' }))
+}
+
+// Rascunho do formulário "Completar dados" a partir do cadastro (CPF sempre em branco:
+// só é enviado se o vendedor digitar um novo).
+export function rascunhoCliente(lead) {
+  return {
+    cpf: '', birthDate: lead?.customerBirthDate || '', gender: lead?.customerGender || '', state: lead?.customerState || '',
+    city: lead?.customerCity || '', hasDriverLicense: typeof lead?.customerHasDriverLicense === 'boolean' ? (lead.customerHasDriverLicense ? 'sim' : 'nao') : '',
+  }
+}
+
+// Valida o rascunho e monta o PATCH só com o que mudou. `campos` = campos exibidos.
+export function patchCliente(rascunho, lead, campos, hoje = new Date()) {
+  const erros = {}; const patch = {}
+  const atual = rascunhoCliente(lead)
+  for (const c of campos) {
+    const v = rascunho[c]
+    if (c === 'cpf') {
+      if (!onlyDigits(v)) { if (!lead?.customerDocumentMasked) erros.cpf = 'Informe o CPF.'; continue }
+      if (!cpfValido(v)) erros.cpf = 'Informe um CPF válido.'; else patch.document = onlyDigits(v)
+      continue
+    }
+    if (v === atual[c] && v) continue
+    if (c === 'birthDate') { const a = idade(v, hoje); if (a === null) erros.birthDate = 'Informe a data de nascimento.'; else if (a < 18 || a > 100) erros.birthDate = 'O cliente precisa ter entre 18 e 100 anos.'; else patch.birthDate = v }
+    if (c === 'gender') { if (!NOMES_SEXO[v]) erros.gender = 'Selecione o sexo.'; else patch.gender = v }
+    if (c === 'state') { if (!UFS.includes(v)) erros.state = 'Selecione a UF.'; else patch.state = v }
+    if (c === 'city') { const t = (v || '').trim(); if (t.length < 2) erros.city = 'Informe a cidade.'; else patch.city = t }
+    if (c === 'hasDriverLicense') { if (!['sim', 'nao'].includes(v)) erros.hasDriverLicense = 'Informe se possui CNH.'; else patch.hasDriverLicense = v === 'sim' }
+  }
+  return { erros: Object.keys(erros).length ? erros : null, patch }
+}
+
+// Veículo estruturado salvo e válido para simular (não pendente de revalidação).
+export const veiculoSalvo = (lead) => lead?.vehicleVersionCode != null && lead.vehicleCatalogNeedsReview !== true
+export const veiculoPrecisaRevalidar = (lead) => lead?.vehicleVersionCode != null && lead.vehicleCatalogNeedsReview === true
+export function descreverVeiculo(lead) {
+  if (lead?.vehicleVersionCode == null) return ''
+  return `${[lead.vehicleBrandName, lead.vehicleModelName].filter(Boolean).join(' ')} · ${lead.vehicleVersionName || ''}`.trim()
 }
 
 export function veiculoCompleto(form) {
@@ -127,12 +176,12 @@ export function negociacao(form) {
 }
 
 // Corpo de POST /api/financiamento/simulacoes. Valores em reais; centavos são com o backend.
-export function montarSimulacao(form, opportunityId, hoje = new Date()) {
+// ZINIX-MVP-002A: CPF, nascimento, sexo, UF, cidade, CNH e o veículo estruturado NÃO
+// vão no corpo: o servidor usa o que está salvo no CRM no momento do envio.
+export function montarSimulacao(form, lead, hoje = new Date()) {
   const erros = {}
-  const mapa = { name: 'applicant.name', phone: 'applicant.phone', email: 'applicant.email', cpf: 'applicant.document', birthDate: 'applicant.birthDate',
-    gender: 'applicant.gender', state: 'applicant.state', city: 'applicant.city', hasDriverLicense: 'applicant.hasDriverLicense' }
-  for (const item of checklistCliente(form, null, hoje)) if (!item.ok) erros[mapa[item.campo]] = item.erro
-  if (!veiculoCompleto(form)) erros['vehicle.versionCode'] = 'Identifique o veículo no catálogo.'
+  for (const item of checklistCliente(form, lead, hoje)) if (!item.ok) erros[`cliente.${item.campo}`] = item.erro
+  if (!veiculoSalvo(lead)) erros.veiculo = 'Identifique e salve o veículo.'
   const n = negociacao(form)
   if (n.erroValor) erros['terms.assetValue'] = n.erroValor
   if (n.erroEntrada) erros['terms.downPayment'] = n.erroEntrada
@@ -141,11 +190,8 @@ export function montarSimulacao(form, opportunityId, hoje = new Date()) {
   return {
     erros: null,
     corpo: {
-      opportunityId,
-      applicant: { document: onlyDigits(form.cpf), name: form.name.trim().replace(/\s+/g, ' '), birthDate: form.birthDate, gender: form.gender,
-        email: form.email.trim(), phone: onlyDigits(form.phone), state: form.state, city: form.city.trim(), hasDriverLicense: form.hasDriverLicense === 'sim' },
-      vehicle: { type: form.type, brandCode: form.brandCode, modelCode: form.modelCode, versionCode: form.versionCode,
-        manufactureYear: Number(form.manufactureYear), modelYear: Number(form.modelYear), zeroKm: form.zeroKm === true },
+      opportunityId: lead.id,
+      applicant: { name: form.name.trim().replace(/\s+/g, ' '), email: form.email.trim(), phone: onlyDigits(form.phone) },
       terms: { assetValue: n.valor, downPayment: n.entrada, installments: n.prazos },
     },
   }

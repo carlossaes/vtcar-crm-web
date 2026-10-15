@@ -3,13 +3,14 @@ import { Landmark, ChevronDown, ChevronUp, RefreshCw, AlertTriangle, CheckCircle
 import CurrencyInput from './CurrencyInput'
 import {
   ETAPAS, UFS, PRAZOS_SUGERIDOS, TERMINAIS, formatCpf, maskCpf, onlyDigits, anosFabricacao, anosModelo, formularioInicial, checklistCliente,
+  CAMPOS_CADASTRO, rascunhoCliente, patchCliente, veiculoSalvo, veiculoPrecisaRevalidar, descreverVeiculo,
   veiculoCompleto, negociacao, montarSimulacao, centsBRL, formatTaxa, STATUS_SIMULACAO, situacaoBanco, explicacaoBanco, resumoFinal,
   ordenarBancos, montarComparativo, valorDaSimulacao, formatData, veiculoDesatualizado,
 } from '../financing'
 import { formatBRL } from '../formInputs'
 import {
   getFinanciamentoMarcas, getFinanciamentoModelos, getFinanciamentoVersoes, getFinanciamentoBancos, criarSimulacaoFinanciamento,
-  getSimulacaoFinanciamento, listarSimulacoesFinanciamento,
+  getSimulacaoFinanciamento, listarSimulacoesFinanciamento, salvarClienteFinanciamento, salvarVeiculoFinanciamento,
 } from '../api'
 
 const control = 'w-full bg-surface2 border border-line rounded-control px-3 py-2 text-[13.5px] outline-none focus:border-brand disabled:opacity-60'
@@ -103,126 +104,190 @@ function ChipSituacao({ banco }) {
 }
 
 // ---------------------------------------------------------------- Cliente
-function EtapaCliente({ form, set, lead, onContinuar }) {
+const ROTULOS_CADASTRO = { cpf: 'CPF', birthDate: 'Data de nascimento', gender: 'Sexo', state: 'UF', city: 'Cidade', hasDriverLicense: 'Possui CNH' }
+
+function FormCadastro({ lead, campos, salvando, erroServidor, onSalvar, onCancelar }) {
+  const [r, setR] = useState(() => rascunhoCliente(lead))
+  const [erros, setErros] = useState(null)
   const [cpfFoco, setCpfFoco] = useState(false)
-  const [corrigindo, setCorrigindo] = useState({})
-  const itens = checklistCliente(form, lead)
-  const ok = itens.filter((i) => i.ok).length
-  const valor = { name: form.name, phone: form.phone, email: form.email }
-  const campoCliente = (campo) => {
-    switch (campo) {
-      case 'name': return <input aria-label="Nome" className={control} value={form.name} onChange={(e) => set('name', e.target.value)} autoComplete="off" />
-      case 'phone': return <input aria-label="Telefone" inputMode="tel" className={control} value={form.phone} onChange={(e) => set('phone', e.target.value)} autoComplete="off" />
-      case 'email': return <input aria-label="E-mail" type="email" className={control} value={form.email} onChange={(e) => set('email', e.target.value)} autoComplete="off" />
-      case 'cpf': return <input aria-label="CPF" className={control} inputMode="numeric" autoComplete="off" placeholder="000.000.000-00"
-        value={cpfFoco ? formatCpf(form.cpf) : maskCpf(form.cpf)} onFocus={() => setCpfFoco(true)} onBlur={() => setCpfFoco(false)}
+  const set = (c, v) => setR((x) => ({ ...x, [c]: v }))
+  const salvar = async () => {
+    const { erros: e, patch } = patchCliente(r, lead, campos)
+    setErros(e)
+    if (e) return
+    if (!Object.keys(patch).length) { onCancelar(); return }
+    await onSalvar(patch)
+  }
+  const erroDe = (c) => erros?.[c] || erroServidor?.fields?.[c === 'cpf' ? 'document' : c]
+  const campo = (c) => {
+    switch (c) {
+      case 'cpf': return <input aria-label="CPF" className={control} inputMode="numeric" autoComplete="off"
+        placeholder={lead.customerDocumentMasked ? `Atual ${lead.customerDocumentMasked} · digite só para trocar` : '000.000.000-00'}
+        value={cpfFoco ? formatCpf(r.cpf) : maskCpf(r.cpf)} onFocus={() => setCpfFoco(true)} onBlur={() => setCpfFoco(false)}
         onChange={(e) => set('cpf', onlyDigits(e.target.value).slice(0, 11))} />
-      case 'birthDate': return <input aria-label="Data de nascimento" type="date" className={control} value={form.birthDate} onChange={(e) => set('birthDate', e.target.value)} />
-      case 'gender': return <Opcoes label="Sexo" value={form.gender} onChange={(v) => set('gender', v)} opcoes={[['male', 'Masculino'], ['female', 'Feminino']]} />
-      case 'state': return <select aria-label="UF" className={control} value={form.state} onChange={(e) => set('state', e.target.value)}>
+      case 'birthDate': return <input aria-label="Data de nascimento" type="date" className={control} value={r.birthDate} onChange={(e) => set('birthDate', e.target.value)} />
+      case 'gender': return <Opcoes label="Sexo" value={r.gender} onChange={(v) => set('gender', v)} opcoes={[['male', 'Masculino'], ['female', 'Feminino']]} />
+      case 'state': return <select aria-label="UF" className={control} value={r.state} onChange={(e) => set('state', e.target.value)}>
         <option value="">Selecione</option>{UFS.map((u) => <option key={u} value={u}>{u}</option>)}</select>
-      case 'city': return <input aria-label="Cidade" className={control} value={form.city} onChange={(e) => set('city', e.target.value)} autoComplete="off" />
-      case 'hasDriverLicense': return <Opcoes label="Possui CNH" value={form.hasDriverLicense} onChange={(v) => set('hasDriverLicense', v)} opcoes={[['sim', 'Sim'], ['nao', 'Não']]} />
+      case 'city': return <input aria-label="Cidade" className={control} value={r.city} onChange={(e) => set('city', e.target.value)} autoComplete="off" />
+      case 'hasDriverLicense': return <Opcoes label="Possui CNH" value={r.hasDriverLicense} onChange={(v) => set('hasDriverLicense', v)} opcoes={[['sim', 'Sim'], ['nao', 'Não']]} />
       default: return null
     }
   }
-  const doCrm = itens.filter((i) => i.origem === 'crm' && !corrigindo[i.campo])
-  const faltando = itens.filter((i) => i.origem !== 'crm' || corrigindo[i.campo])
+  return (
+    <section aria-label="Completar dados do cliente" className="rounded-card border border-line bg-surface p-3.5 space-y-3">
+      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {campos.map((c) => (
+          <li key={c}>
+            <Campo as={['gender', 'hasDriverLicense'].includes(c) ? 'div' : 'label'} label={ROTULOS_CADASTRO[c]} erro={erroDe(c)}>{campo(c)}</Campo>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11.5px] text-ink3">Fica salvo no cadastro desta oportunidade e é reaproveitado nas próximas simulações. O CPF aparece sempre mascarado.</p>
+      {erroServidor?.msg && !erroServidor.fields && <p role="alert" className="text-[12px] text-critical">{erroServidor.msg}</p>}
+      <div className="flex justify-end gap-2">
+        <button type="button" className={btnSecundario} onClick={onCancelar} disabled={salvando}>Cancelar</button>
+        <button type="button" className={btnPrimario} onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar dados do cliente'}</button>
+      </div>
+    </section>
+  )
+}
+
+function EtapaCliente({ form, set, lead, salvando, erroServidor, onSalvarCliente, onContinuar }) {
+  const [editar, setEditar] = useState(null) // null | lista de campos do cadastro
+  const [corrigindo, setCorrigindo] = useState({})
+  const itens = checklistCliente(form, lead)
+  const ok = itens.filter((i) => i.ok).length
+  const faltando = itens.filter((i) => i.origem === 'cadastro' && !i.ok).map((i) => i.campo)
+  const inputSimulacao = (campo) => {
+    const props = { className: control, autoComplete: 'off', value: form[campo], onChange: (e) => set(campo, e.target.value) }
+    if (campo === 'name') return <input aria-label="Nome" {...props} />
+    if (campo === 'phone') return <input aria-label="Telefone" inputMode="tel" {...props} />
+    return <input aria-label="E-mail" type="email" {...props} />
+  }
+  const salvar = async (patch) => { if (await onSalvarCliente(patch)) setEditar(null) }
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[12.5px] text-ink2">O CRM já tem parte dos dados. Complete só o que falta.</p>
+        <p className="text-[12.5px] text-ink2">Dados do cadastro do cliente usados na simulação.</p>
         <span className="text-[12px] font-semibold tnum whitespace-nowrap" aria-label="Completude">{ok} de {itens.length} ok</span>
       </div>
-
-      {doCrm.length > 0 && (
-        <Bloco titulo="Do CRM">
-          <ul className="space-y-1.5" aria-label="Dados do CRM">
-            {doCrm.map((i) => (
-              <li key={i.campo} className="flex items-center justify-between gap-2 text-[13px]">
-                <span className="flex items-center gap-1.5 min-w-0"><Check size={13} className="text-good shrink-0" aria-hidden="true" />
-                  <span className="text-ink3 whitespace-nowrap">{i.label}</span><span className="font-medium truncate">{valor[i.campo]}</span></span>
-                <button type="button" onClick={() => setCorrigindo((c) => ({ ...c, [i.campo]: true }))} aria-label={`Corrigir ${i.label}`}
-                  className="flex items-center gap-1 text-[11.5px] text-ink3 hover:text-ink shrink-0"><Pencil size={11} />Corrigir</button>
+      <Bloco titulo="Dados do cliente">
+        <ul className="space-y-1.5" aria-label="Dados do cliente">
+          {itens.map((i) => {
+            const simulacao = i.origem !== 'cadastro' && (i.origem === 'simulacao' || corrigindo[i.campo])
+            return (
+              <li key={i.campo} className="text-[13px]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    {i.ok ? <Check size={13} className="text-good shrink-0" aria-label="ok" /> : <Circle size={10} className="text-ink3 shrink-0 mx-[1.5px]" aria-label="falta" />}
+                    <span className="text-ink3 whitespace-nowrap">{i.label}</span>
+                    {!simulacao && <span className={`truncate ${i.ok ? 'font-medium' : 'text-ink3'}`}>{i.ok ? i.valor : 'Falta'}</span>}
+                  </span>
+                  {i.origem === 'crm' && !corrigindo[i.campo] && (
+                    <button type="button" onClick={() => setCorrigindo((c) => ({ ...c, [i.campo]: true }))} aria-label={`Corrigir ${i.label}`}
+                      className="flex items-center gap-1 text-[11.5px] text-ink3 hover:text-ink shrink-0"><Pencil size={11} />Corrigir</button>
+                  )}
+                </div>
+                {simulacao && <div className="mt-1 pl-5">{inputSimulacao(i.campo)}<span className="block text-[11px] text-ink3 mt-0.5">Vale só para esta simulação (dados de contato da oportunidade não são editados aqui).</span></div>}
               </li>
-            ))}
-          </ul>
-        </Bloco>
-      )}
-
-      <Bloco titulo="Para esta simulação">
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Dados a completar">
-          {faltando.map((i) => (
-            <li key={i.campo}>
-              <Campo as={['gender', 'hasDriverLicense'].includes(i.campo) ? 'div' : 'label'} label={<span className="flex items-center gap-1">{i.ok ? <Check size={12} className="text-good" aria-hidden="true" /> : <Circle size={10} className="text-ink3" aria-hidden="true" />}{i.label}</span>}
-                erro={!i.ok && form[`_tocado_${i.campo}`] ? i.erro : null}>
-                {campoCliente(i.campo)}
-              </Campo>
-            </li>
-          ))}
+            )
+          })}
         </ul>
-        <p className="text-[11.5px] text-ink3">CPF, nascimento, sexo, UF, cidade e CNH valem só para esta simulação: não ficam gravados no CRM nem no histórico de simulações.</p>
+        {!editar && (
+          <div className="pt-1">
+            {faltando.length > 0
+              ? <button type="button" className={btnPrimario} onClick={() => setEditar(faltando)}>COMPLETAR DADOS</button>
+              : <button type="button" className={btnSecundario} onClick={() => setEditar(CAMPOS_CADASTRO)}>Editar dados do cliente</button>}
+          </div>
+        )}
       </Bloco>
-
+      {editar && <FormCadastro lead={lead} campos={editar} salvando={salvando} erroServidor={erroServidor} onSalvar={salvar} onCancelar={() => setEditar(null)} />}
       <p className="flex gap-2 text-[11.5px] text-ink3"><ShieldCheck size={13} className="shrink-0 mt-[1px]" aria-hidden="true" />{LGPD}</p>
       <div className="flex justify-end">
-        <button type="button" className={btnPrimario} disabled={ok !== itens.length} onClick={onContinuar}>Continuar</button>
+        <button type="button" className={btnPrimario} disabled={ok !== itens.length || !!editar} onClick={onContinuar}>Continuar</button>
       </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------- Veículo
-function EtapaVeiculo({ form, set, lead, catalogo, naoConfigurado, onVoltar, onContinuar }) {
+const AVISO_REVALIDAR = 'O veículo de interesse foi alterado. Confirme novamente os dados do veículo antes de uma nova simulação.'
+
+function EtapaVeiculo({ form, set, lead, catalogo, naoConfigurado, editando, onEditar, salvando, erroVeiculo, onSalvar, onVoltar, onContinuar }) {
+  const revalidar = veiculoPrecisaRevalidar(lead)
+  const seletor = editando || !veiculoSalvo(lead)
   return (
     <div className="space-y-3">
       <Bloco titulo="Veículo de interesse da oportunidade">
         {lead.vehicleInterest
           ? <p className="text-[15px] font-semibold">{lead.vehicleInterest}</p>
           : <p className="text-[12.5px] text-ink2">Não informado. Você pode registrá-lo em “Editar negócio”.</p>}
-        <p className="text-[12px] text-ink2">Identifique este mesmo veículo no catálogo de financiamento. É o mesmo veículo da oportunidade, não um cadastro novo.</p>
       </Bloco>
-      {naoConfigurado && (
-        <div role="status" className="text-[12.5px] text-ink2 bg-surface border border-line rounded-control px-3 py-2 flex gap-2">
-          <Info size={14} className="shrink-0 mt-[1px]" aria-hidden="true" />O financiamento ainda não está configurado no servidor. Fale com o administrador.
+      {revalidar && (
+        <div role="alert" className="text-[12.5px] text-ink bg-surface border border-lineStrong rounded-control px-3 py-2 flex gap-2">
+          <AlertTriangle size={14} className="shrink-0 mt-[1px]" aria-hidden="true" />{AVISO_REVALIDAR}
         </div>
       )}
-      <div className="flex gap-1.5" role="group" aria-label="Tipo de veículo">
-        {[['car', 'Carro'], ['motorcycle', 'Moto']].map(([v, l]) => (
-          <button key={v} type="button" aria-pressed={form.type === v} onClick={() => set('type', v)}
-            className={`rounded-control h-8 px-3 text-[12.5px] font-medium border ${form.type === v ? 'border-brand bg-brand/10 text-ink' : 'border-line text-ink2 hover:text-ink'}`}>{l}</button>
-        ))}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Seletor label="Marca" value={form.brandCode} onChange={(v) => set('brandCode', v)} vazio="Selecione a marca" opcoes={catalogo.marcas}
-          carregando={catalogo.carregando === 'marcas'} disabled={naoConfigurado} />
-        <Seletor label="Modelo" value={form.modelCode} onChange={(v) => set('modelCode', v)} vazio={form.brandCode ? 'Selecione o modelo' : 'Escolha a marca primeiro'}
-          opcoes={catalogo.modelos} carregando={catalogo.carregando === 'modelos'} disabled={!form.brandCode} />
-        <Seletor label="Ano de fabricação" value={String(form.manufactureYear)} onChange={(v) => set('manufactureYear', v ? Number(v) : '')} vazio="Selecione"
-          opcoes={anosFabricacao().map((a) => ({ value: String(a), label: String(a) }))} disabled={!form.modelCode} />
-        <Seletor label="Ano do modelo" value={String(form.modelYear)} onChange={(v) => set('modelYear', v ? Number(v) : '')} vazio="Selecione"
-          opcoes={anosModelo(form.manufactureYear).map((a) => ({ value: String(a), label: String(a) }))} disabled={!form.manufactureYear} />
-        <Seletor label="Versão" value={form.versionCode} onChange={(v) => set('versionCode', v)} vazio={form.modelYear ? 'Selecione a versão' : 'Escolha modelo e anos primeiro'}
-          opcoes={catalogo.versoes} carregando={catalogo.carregando === 'versoes'} disabled={!form.modelYear} />
-        <div className="text-[12px] text-ink2">Zero km
-          <div className="mt-1"><Opcoes label="Zero km" value={form.zeroKm} onChange={(v) => set('zeroKm', v)} opcoes={[[true, 'Sim'], [false, 'Não']]} /></div>
-        </div>
-      </div>
-      {catalogo.erro && !naoConfigurado && <p className="text-[12px] text-critical">{catalogo.erro}</p>}
+      {!seletor ? (
+        <Bloco titulo="Veículo identificado para financiamento" acao={
+          <button type="button" onClick={onEditar} className="text-[11.5px] text-ink2 hover:text-ink flex items-center gap-1"><Pencil size={11} />Alterar veículo</button>}>
+          <p className="flex items-center gap-1.5 text-[13.5px] font-medium"><Check size={14} className="text-good shrink-0" aria-hidden="true" />{descreverVeiculo(lead)}</p>
+          <Linha rotulo="Tipo" valor={lead.vehicleType === 'motorcycle' ? 'Moto' : 'Carro'} />
+          <Linha rotulo="Ano" valor={`${lead.vehicleManufactureYear}/${lead.vehicleModelYear}`} />
+          <Linha rotulo="Zero km" valor={lead.vehicleZeroKm ? 'Sim' : 'Não'} />
+        </Bloco>
+      ) : (
+        <Bloco titulo={revalidar ? 'Confirmar veículo para financiamento' : 'Identificar veículo para financiamento'}>
+          <p className="text-[12px] text-ink2">É o mesmo veículo da oportunidade, identificado no catálogo de financiamento. Fica salvo na oportunidade.</p>
+          {naoConfigurado && (
+            <div role="status" className="text-[12.5px] text-ink2 bg-surface border border-line rounded-control px-3 py-2 flex gap-2">
+              <Info size={14} className="shrink-0 mt-[1px]" aria-hidden="true" />O financiamento ainda não está configurado no servidor. Fale com o administrador.
+            </div>
+          )}
+          <div className="flex gap-1.5" role="group" aria-label="Tipo de veículo">
+            {[['car', 'Carro'], ['motorcycle', 'Moto']].map(([v, l]) => (
+              <button key={v} type="button" aria-pressed={form.type === v} onClick={() => set('type', v)}
+                className={`rounded-control h-8 px-3 text-[12.5px] font-medium border ${form.type === v ? 'border-brand bg-brand/10 text-ink' : 'border-line text-ink2 hover:text-ink'}`}>{l}</button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Seletor label="Marca" value={form.brandCode} onChange={(v) => set('brandCode', v)} vazio="Selecione a marca" opcoes={catalogo.marcas}
+              carregando={catalogo.carregando === 'marcas'} disabled={naoConfigurado} />
+            <Seletor label="Modelo" value={form.modelCode} onChange={(v) => set('modelCode', v)} vazio={form.brandCode ? 'Selecione o modelo' : 'Escolha a marca primeiro'}
+              opcoes={catalogo.modelos} carregando={catalogo.carregando === 'modelos'} disabled={!form.brandCode} />
+            <Seletor label="Ano de fabricação" value={String(form.manufactureYear)} onChange={(v) => set('manufactureYear', v ? Number(v) : '')} vazio="Selecione"
+              opcoes={anosFabricacao().map((a) => ({ value: String(a), label: String(a) }))} disabled={!form.modelCode} />
+            <Seletor label="Ano do modelo" value={String(form.modelYear)} onChange={(v) => set('modelYear', v ? Number(v) : '')} vazio="Selecione"
+              opcoes={anosModelo(form.manufactureYear).map((a) => ({ value: String(a), label: String(a) }))} disabled={!form.manufactureYear} />
+            <Seletor label="Versão" value={form.versionCode} onChange={(v) => set('versionCode', v)} vazio={form.modelYear ? 'Selecione a versão' : 'Escolha modelo e anos primeiro'}
+              opcoes={catalogo.versoes} carregando={catalogo.carregando === 'versoes'} disabled={!form.modelYear} />
+            <div className="text-[12px] text-ink2">Zero km
+              <div className="mt-1"><Opcoes label="Zero km" value={form.zeroKm} onChange={(v) => set('zeroKm', v)} opcoes={[[true, 'Sim'], [false, 'Não']]} /></div>
+            </div>
+          </div>
+          {catalogo.erro && !naoConfigurado && <p className="text-[12px] text-critical">{catalogo.erro}</p>}
+          {erroVeiculo && <p role="alert" className="text-[12px] text-critical">{erroVeiculo}</p>}
+          <div className="flex justify-end">
+            <button type="button" className={btnPrimario} disabled={!veiculoCompleto(form) || salvando || naoConfigurado} onClick={onSalvar}>
+              {salvando ? 'Salvando…' : revalidar ? 'Confirmar veículo' : 'Salvar veículo'}
+            </button>
+          </div>
+        </Bloco>
+      )}
       <div className="flex justify-between gap-2">
         <button type="button" className={btnSecundario} onClick={onVoltar}>Voltar</button>
-        <button type="button" className={btnPrimario} disabled={!veiculoCompleto(form)} onClick={onContinuar}>Continuar</button>
+        <button type="button" className={btnPrimario} disabled={seletor} onClick={onContinuar}>Continuar</button>
       </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------- Revisão
-function EtapaRevisao({ form, set, lead, catalogo, bancos, naoConfigurado, enviando, erroGeral, podeReenviar, onIr, onSimular }) {
+function EtapaRevisao({ form, set, lead, bancos, naoConfigurado, enviando, erroGeral, podeReenviar, onIr, onSimular }) {
   const [outroPrazo, setOutroPrazo] = useState('')
   const n = negociacao(form)
   const origem = valorDaSimulacao(lead).origem
-  const nome = (lista, code) => lista.find((i) => i.value === code)?.label || '—'
   const togglePrazo = (p) => set('installments', form.installments.includes(p) ? form.installments.filter((x) => x !== p) : [...form.installments, p].sort((a, b) => a - b))
   const prazos = [...new Set([...PRAZOS_SUGERIDOS, ...form.installments])].sort((a, b) => a - b)
   const adicionar = () => { const p = Number(outroPrazo); if (Number.isSafeInteger(p) && p >= 1 && p <= 84 && !form.installments.includes(p)) togglePrazo(p); setOutroPrazo('') }
@@ -231,18 +296,18 @@ function EtapaRevisao({ form, set, lead, catalogo, bancos, naoConfigurado, envia
     <div className="space-y-3">
       <Bloco titulo="Cliente" acao={alterar('cliente')}>
         <Linha rotulo="Nome" valor={form.name} />
-        <Linha rotulo="CPF" valor={maskCpf(form.cpf)} />
+        <Linha rotulo="CPF" valor={lead.customerDocumentMasked} />
         <Linha rotulo="Telefone" valor={form.phone} />
         <Linha rotulo="E-mail" valor={form.email} />
-        <Linha rotulo="Nascimento" valor={formatData(form.birthDate)} />
-        <Linha rotulo="Cidade / UF" valor={`${form.city.trim()} / ${form.state}`} />
-        <Linha rotulo="CNH" valor={form.hasDriverLicense === 'sim' ? 'Sim' : 'Não'} />
+        <Linha rotulo="Nascimento" valor={formatData(lead.customerBirthDate)} />
+        <Linha rotulo="Cidade / UF" valor={`${lead.customerCity} / ${lead.customerState}`} />
+        <Linha rotulo="CNH" valor={lead.customerHasDriverLicense ? 'Sim' : 'Não'} />
       </Bloco>
       <Bloco titulo="Veículo" acao={alterar('veiculo')}>
         <Linha rotulo="Veículo de interesse" valor={lead.vehicleInterest || 'Não informado'} />
-        <Linha rotulo="Catálogo" valor={`${nome(catalogo.marcas, form.brandCode)} ${nome(catalogo.modelos, form.modelCode)} · ${nome(catalogo.versoes, form.versionCode)}`} />
-        <Linha rotulo="Ano" valor={`${form.manufactureYear}/${form.modelYear}`} />
-        <Linha rotulo="Zero km" valor={form.zeroKm ? 'Sim' : 'Não'} />
+        <Linha rotulo="Catálogo" valor={descreverVeiculo(lead)} />
+        <Linha rotulo="Ano" valor={`${lead.vehicleManufactureYear}/${lead.vehicleModelYear}`} />
+        <Linha rotulo="Zero km" valor={lead.vehicleZeroKm ? 'Sim' : 'Não'} />
       </Bloco>
       <Bloco titulo="Negociação">
         <Linha rotulo="Valor do bem" valor={lead.assetValue > 0 ? formatBRL(lead.assetValue) : 'Não informado'} />
@@ -301,7 +366,7 @@ function EtapaRevisao({ form, set, lead, catalogo, bancos, naoConfigurado, envia
       <div className="flex justify-between gap-2">
         <button type="button" className={btnSecundario} onClick={() => onIr('veiculo')} disabled={enviando}>Voltar</button>
         <button type="button" className={btnPrimario} onClick={onSimular}
-          disabled={enviando || naoConfigurado || !!(n.erroValor || n.erroEntrada || n.erroPrazos)}>
+          disabled={enviando || naoConfigurado || !veiculoSalvo(lead) || !!(n.erroValor || n.erroEntrada || n.erroPrazos)}>
           {enviando ? 'Enviando aos bancos…' : podeReenviar ? 'Tentar novamente' : 'SIMULAR FINANCIAMENTO'}
         </button>
       </div>
@@ -461,8 +526,17 @@ function EtapaResultados({ sim, lead, historico, onAbrir, onAtualizar, atualizan
 }
 
 // ---------------------------------------------------------------- Container
-export default function OpportunityFinancing({ lead, usuario }) {
+export default function OpportunityFinancing({ lead: leadProp, usuario, onLeadChanged }) {
+  // Cópia local da oportunidade: atualizada pelo que o servidor devolve ao salvar
+  // cliente/veículo e sincronizada quando a oportunidade muda fora daqui.
+  const [lead, setLead] = useState(leadProp)
+  useEffect(() => { setLead(leadProp) }, [leadProp])
   const podeSimular = usuario?.papel === 'gerente' || (usuario?.papel === 'vendedor' && usuario.id === lead.ownerId)
+  const [salvandoCliente, setSalvandoCliente] = useState(false)
+  const [erroCliente, setErroCliente] = useState(null)
+  const [editandoVeiculo, setEditandoVeiculo] = useState(false)
+  const [salvandoVeiculo, setSalvandoVeiculo] = useState(false)
+  const [erroVeiculo, setErroVeiculo] = useState(null)
   const [aberto, setAberto] = useState(false)
   const [etapa, setEtapa] = useState(null) // null = carregando histórico
   const [form, setForm] = useState(() => formularioInicial(lead))
@@ -517,24 +591,49 @@ export default function OpportunityFinancing({ lead, usuario }) {
       })
   }, [])
 
-  // Catálogo só é consultado na etapa Veículo (e mantido para a Revisão).
+  // Catálogo só é consultado na etapa Veículo, e só se for preciso identificar/alterar o veículo.
+  const seletor = etapa === 'veiculo' && (editandoVeiculo || !veiculoSalvo(lead))
   useEffect(() => {
-    if (etapa !== 'veiculo') return
+    if (!seletor) return
     setCatalogo((c) => ({ ...c, marcas: [] }))
     carregar('marcas', () => getFinanciamentoMarcas(form.type))
-  }, [etapa === 'veiculo', form.type, carregar]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [seletor, form.type, carregar]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (etapa !== 'veiculo') return
+    if (!seletor) return
     setCatalogo((c) => ({ ...c, modelos: [], versoes: [] }))
     if (form.brandCode) carregar('modelos', () => getFinanciamentoModelos(form.type, form.brandCode))
-  }, [etapa === 'veiculo', form.type, form.brandCode, carregar]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [seletor, form.type, form.brandCode, carregar]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (etapa !== 'veiculo') return
+    if (!seletor) return
     setCatalogo((c) => ({ ...c, versoes: [] }))
     if (form.modelCode && form.manufactureYear && form.modelYear) {
       carregar('versoes', () => getFinanciamentoVersoes(form.type, form.brandCode, form.modelCode, form.manufactureYear, form.modelYear))
     }
-  }, [etapa === 'veiculo', form.type, form.brandCode, form.modelCode, form.manufactureYear, form.modelYear, carregar]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [seletor, form.type, form.brandCode, form.modelCode, form.manufactureYear, form.modelYear, carregar]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const aplicarLead = (novo) => { if (!novo) return; setLead(novo); onLeadChanged?.(novo) }
+
+  // Grava os dados do cliente no cadastro da oportunidade (PATCH com allowlist no servidor).
+  const salvarCliente = async (patch) => {
+    setSalvandoCliente(true); setErroCliente(null)
+    try { const novo = await salvarClienteFinanciamento(lead.id, patch); if (montado.current) aplicarLead(novo); return true }
+    catch (err) { if (montado.current) setErroCliente({ msg: err.message, fields: err.body?.fields || null }); return false }
+    finally { if (montado.current) setSalvandoCliente(false) }
+  }
+
+  // Grava a estrutura técnica do veículo (o servidor confere no catálogo e guarda os nomes).
+  const salvarVeiculo = async () => {
+    setSalvandoVeiculo(true); setErroVeiculo(null)
+    try {
+      const novo = await salvarVeiculoFinanciamento(lead.id, { type: form.type, brandCode: form.brandCode, modelCode: form.modelCode, versionCode: form.versionCode,
+        manufactureYear: Number(form.manufactureYear), modelYear: Number(form.modelYear), zeroKm: form.zeroKm === true })
+      if (montado.current) { aplicarLead(novo); setEditandoVeiculo(false) }
+    } catch (err) {
+      if (!montado.current) return
+      if (err.body?.code === 'nao_configurado') setNaoConfigurado(true)
+      setErroVeiculo(err.message)
+    } finally { if (montado.current) setSalvandoVeiculo(false) }
+  }
 
   // Bancos: carregados da API ao chegar na Revisão. Nunca uma lista fixa.
   useEffect(() => {
@@ -569,7 +668,7 @@ export default function OpportunityFinancing({ lead, usuario }) {
   // ÚNICO ponto que envia a simulação: o clique em SIMULAR FINANCIAMENTO.
   const simular = async () => {
     if (enviandoRef.current) return
-    const { erros, corpo } = montarSimulacao(form, lead.id)
+    const { erros, corpo } = montarSimulacao(form, lead)
     setErroGeral(null); setPodeReenviar(false)
     if (erros) { setErroGeral('Há dados incompletos. Use “Alterar” para revisar.'); return }
     enviandoRef.current = true
@@ -582,14 +681,16 @@ export default function OpportunityFinancing({ lead, usuario }) {
       if (!montado.current) return
       setErroGeral(err.message)
       setPodeReenviar(err.body?.simulation?.canRetry === true)
+      if (err.body?.code === 'veiculo_revalidar') setLead((l) => ({ ...l, vehicleCatalogNeedsReview: true }))
       if (err.body?.code === 'nao_configurado') setNaoConfigurado(true)
     } finally { enviandoRef.current = false; if (montado.current) setEnviando(false) }
   }
 
   if (!podeSimular) return null
   const clienteOk = checklistCliente(form, lead).every((i) => i.ok)
-  const liberadas = ['cliente', ...(clienteOk ? ['veiculo'] : []), ...(clienteOk && veiculoCompleto(form) ? ['revisao'] : []), ...(atual ? ['resultados'] : [])]
-  const concluidas = [...(clienteOk ? ['cliente'] : []), ...(veiculoCompleto(form) ? ['veiculo'] : []), ...(atual ? ['revisao'] : [])]
+  const veicOk = veiculoSalvo(lead)
+  const liberadas = ['cliente', ...(clienteOk ? ['veiculo'] : []), ...(clienteOk && veicOk ? ['revisao'] : []), ...(atual ? ['resultados'] : [])]
+  const concluidas = [...(clienteOk ? ['cliente'] : []), ...(veicOk ? ['veiculo'] : []), ...(atual ? ['revisao'] : [])]
   const ir = (e) => { setErroGeral(null); setEtapa(e) }
 
   return (
@@ -603,12 +704,15 @@ export default function OpportunityFinancing({ lead, usuario }) {
           {etapa === null ? <p className="text-[12.5px] text-ink2">Carregando simulações…</p> : (
             <>
               <Etapas atual={etapa} liberadas={liberadas} concluidas={concluidas} onIr={ir} />
-              {etapa === 'cliente' && <EtapaCliente form={form} set={set} lead={lead} onContinuar={() => ir('veiculo')} />}
-              {etapa === 'veiculo' && <EtapaVeiculo form={form} set={set} lead={lead} catalogo={catalogo} naoConfigurado={naoConfigurado} onVoltar={() => ir('cliente')} onContinuar={() => ir('revisao')} />}
-              {etapa === 'revisao' && <EtapaRevisao form={form} set={set} lead={lead} catalogo={catalogo} bancos={bancos} naoConfigurado={naoConfigurado}
+              {etapa === 'cliente' && <EtapaCliente form={form} set={set} lead={lead} salvando={salvandoCliente} erroServidor={erroCliente}
+                onSalvarCliente={salvarCliente} onContinuar={() => ir('veiculo')} />}
+              {etapa === 'veiculo' && <EtapaVeiculo form={form} set={set} lead={lead} catalogo={catalogo} naoConfigurado={naoConfigurado}
+                editando={editandoVeiculo} onEditar={() => setEditandoVeiculo(true)} salvando={salvandoVeiculo} erroVeiculo={erroVeiculo} onSalvar={salvarVeiculo}
+                onVoltar={() => ir('cliente')} onContinuar={() => ir('revisao')} />}
+              {etapa === 'revisao' && <EtapaRevisao form={form} set={set} lead={lead} bancos={bancos} naoConfigurado={naoConfigurado}
                 enviando={enviando} erroGeral={erroGeral} podeReenviar={podeReenviar} onIr={ir} onSimular={simular} />}
               {etapa === 'resultados' && atual && <EtapaResultados sim={atual} lead={lead} historico={historico} onAbrir={setAtual} onAtualizar={atualizar}
-                atualizando={atualizando} autoAtivo={Date.now() <= autoAte} onNova={() => ir(clienteOk ? (veiculoCompleto(form) ? 'revisao' : 'veiculo') : 'cliente')} />}
+                atualizando={atualizando} autoAtivo={Date.now() <= autoAte} onNova={() => ir(clienteOk ? (veicOk ? 'revisao' : 'veiculo') : 'cliente')} />}
             </>
           )}
         </div>

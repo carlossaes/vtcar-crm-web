@@ -124,6 +124,15 @@ export function getFinanciamentoBancos() {
   return request('/api/financiamento/bancos')
 }
 
+// ZINIX-MVP-002A: dados do cliente e veículo estruturado gravados na oportunidade.
+export function salvarClienteFinanciamento(opportunityId, dados) {
+  return request(`/api/financiamento/oportunidades/${encodeURIComponent(opportunityId)}/cliente`, { method: 'PATCH', body: JSON.stringify(dados) })
+}
+
+export function salvarVeiculoFinanciamento(opportunityId, dados) {
+  return request(`/api/financiamento/oportunidades/${encodeURIComponent(opportunityId)}/veiculo`, { method: 'PUT', body: JSON.stringify(dados) })
+}
+
 export function criarSimulacaoFinanciamento(dados) {
   return request('/api/financiamento/simulacoes', { method: 'POST', body: JSON.stringify(dados) })
 }

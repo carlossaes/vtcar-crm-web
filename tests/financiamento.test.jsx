@@ -7,13 +7,15 @@ import OpportunityFinancing from '../src/components/OpportunityFinancing'
 import LeadModal from '../src/components/LeadModal'
 import {
   cpfValido, formatCpf, maskCpf, montarSimulacao, formatTaxa, formularioInicial, STATUS_SIMULACAO, situacaoBanco, explicacaoBanco, resumoFinal,
-  checklistCliente, dadosDoCrm, valorDaSimulacao, negociacao, montarComparativo, veiculoDesatualizado,
+  checklistCliente, dadosDoCrm, valorDaSimulacao, negociacao, montarComparativo, veiculoDesatualizado, patchCliente, rascunhoCliente,
+  veiculoSalvo, veiculoPrecisaRevalidar, descreverVeiculo,
 } from '../src/financing'
 import * as api from '../src/api'
 
 vi.mock('../src/api', () => ({
   getFinanciamentoMarcas: vi.fn(), getFinanciamentoModelos: vi.fn(), getFinanciamentoVersoes: vi.fn(), getFinanciamentoBancos: vi.fn(),
   criarSimulacaoFinanciamento: vi.fn(), getSimulacaoFinanciamento: vi.fn(), listarSimulacoesFinanciamento: vi.fn(),
+  salvarClienteFinanciamento: vi.fn(), salvarVeiculoFinanciamento: vi.fn(),
   getLeadMessages: vi.fn(() => Promise.resolve([])), getLeadCoach: vi.fn(() => Promise.resolve(null)),
   regenerateLeadCoach: vi.fn(), assumirLead: vi.fn(), atribuirResponsavel: vi.fn(), removerResponsavel: vi.fn(),
   updateOpportunity: vi.fn(), updateLeadData: vi.fn(), updateFollowUp: vi.fn(), completeTask: vi.fn(),
@@ -26,6 +28,29 @@ const lead = { id: 'opp1', name: 'Joana Lima', email: 'joana@example.invalid', p
   stage: 'negociacao', vehicleInterest: 'POP 100', assetValue: 129900, negotiatedValue: 125000, downPayment: 30000, installmentsCount: 48,
   channel: 'WhatsApp', createdAt: '2026-10-01T10:00:00Z' }
 const HOJE = new Date('2026-10-14T12:00:00')
+// Oportunidade NOVA COMPLETA, como o servidor devolve (CPF só mascarado; dados FICTÍCIOS).
+const CADASTRO = { customerDocumentMasked: '•••.•••.•••-25', customerBirthDate: '1990-05-20', customerGender: 'female', customerState: 'PR',
+  customerCity: 'Londrina', customerHasDriverLicense: true }
+const VEICULO = { vehicleType: 'car', vehicleBrandCode: '59', vehicleBrandName: 'TOYOTA', vehicleModelCode: '5001', vehicleModelName: 'COROLLA',
+  vehicleVersionCode: 'v-xei', vehicleVersionName: 'XEI 2.0 FLEX', vehicleManufactureYear: 2024, vehicleModelYear: 2025, vehicleZeroKm: false,
+  vehicleCatalogInterest: 'POP 100', vehicleCatalogConfirmedAt: '2026-10-14T10:00:00Z', vehicleCatalogNeedsReview: false }
+const leadCompleto = { ...lead, ...CADASTRO, ...VEICULO }
+
+// Backend falso das rotas novas: aplica o que recebe e devolve a oportunidade como o servidor faria.
+const MAPA = { document: 'customerDocument', birthDate: 'customerBirthDate', gender: 'customerGender', state: 'customerState', city: 'customerCity', hasDriverLicense: 'customerHasDriverLicense' }
+function servidorFalso() {
+  api.salvarClienteFinanciamento.mockImplementation(async (id, dados) => {
+    const r = {}
+    for (const [k, v] of Object.entries(dados)) {
+      if (k === 'document') r.customerDocumentMasked = `•••.•••.•••-${v.slice(9)}`
+      else r[MAPA[k]] = v
+    }
+    return r
+  })
+  api.salvarVeiculoFinanciamento.mockImplementation(async (id, v) => ({ vehicleType: v.type, vehicleBrandCode: v.brandCode, vehicleBrandName: 'TOYOTA',
+    vehicleModelCode: v.modelCode, vehicleModelName: 'COROLLA', vehicleVersionCode: v.versionCode, vehicleVersionName: 'XEI 2.0 FLEX',
+    vehicleManufactureYear: v.manufactureYear, vehicleModelYear: v.modelYear, vehicleZeroKm: v.zeroKm, vehicleCatalogNeedsReview: false }))
+}
 // Nomes vindos SOMENTE do mock da API: se aparecerem na tela, vieram da API.
 const BANCOS_API = [
   { code: 'banco-x', name: 'Banco Xis Teste', status: 'enabled', habilitado: true },
@@ -46,6 +71,7 @@ beforeEach(() => {
   api.getFinanciamentoModelos.mockResolvedValue([{ code: '5001', name: 'COROLLA' }])
   api.getFinanciamentoVersoes.mockResolvedValue([{ code: 'v-xei', name: 'XEI 2.0 FLEX' }])
   api.getFinanciamentoBancos.mockResolvedValue(BANCOS_API)
+  servidorFalso()
 })
 
 // ------------------------------------------------------------------ regras puras
@@ -61,13 +87,20 @@ describe('regras puras', () => {
     expect(dadosDoCrm(lead)).toEqual({ name: 'Joana Lima', phone: '43999887766', email: 'joana@example.invalid' })
     expect(dadosDoCrm({ ...lead, phone: '5543999@lid', email: 'invalido' })).toMatchObject({ phone: '', email: '' })
     const f = formularioInicial(lead)
-    expect(f).toMatchObject({ name: 'Joana Lima', email: 'joana@example.invalid', cpf: '', birthDate: '', gender: '', state: '', city: '', hasDriverLicense: '' })
+    expect(f).toMatchObject({ name: 'Joana Lima', email: 'joana@example.invalid', brandCode: '', versionCode: '', type: 'car', zeroKm: false })
+    expect(f.cpf).toBeUndefined() // o CPF não vive no formulário da simulação
+    expect(formularioInicial(leadCompleto)).toMatchObject({ type: 'car', brandCode: '59', modelCode: '5001', versionCode: 'v-xei', manufactureYear: 2024, modelYear: 2025 })
     expect(f.phone).toMatch(/99988-7766/)
   })
-  it('checklist marca como CRM só o que o CRM já tem', () => {
+  it('checklist: contato do CRM + cadastro do cliente salvo na oportunidade', () => {
     const itens = checklistCliente(formularioInicial(lead), lead, HOJE)
     expect(itens.filter((i) => i.origem === 'crm').map((i) => i.campo)).toEqual(['name', 'phone', 'email'])
+    expect(itens.filter((i) => i.origem === 'cadastro').map((i) => i.campo)).toEqual(['cpf', 'birthDate', 'gender', 'state', 'city', 'hasDriverLicense'])
     expect(itens.filter((i) => !i.ok).map((i) => i.campo)).toEqual(['cpf', 'birthDate', 'gender', 'state', 'city', 'hasDriverLicense'])
+    const completo = checklistCliente(formularioInicial(leadCompleto), leadCompleto, HOJE)
+    expect(completo.every((i) => i.ok)).toBe(true)
+    expect(completo.find((i) => i.campo === 'cpf').valor).toBe('•••.•••.•••-25')
+    expect(completo.find((i) => i.campo === 'birthDate').valor).toBe('20/05/1990')
     const semEmail = checklistCliente(formularioInicial({ ...lead, email: '' }), { ...lead, email: '' }, HOJE)
     expect(semEmail.find((i) => i.campo === 'email')).toMatchObject({ origem: 'simulacao', ok: false })
   })
@@ -77,19 +110,39 @@ describe('regras puras', () => {
     expect(valorDaSimulacao({})).toEqual({ valor: null, origem: null })
     expect(negociacao(formularioInicial(lead)).financiar).toBe(95000)
   })
-  it('monta o corpo com reais (não centavos), prazos ordenados e telefone só dígitos', () => {
-    const form = { ...formularioInicial(lead), cpf: '52998224725', birthDate: '1990-05-20', gender: 'female', state: 'PR', city: 'Londrina',
-      hasDriverLicense: 'sim', brandCode: '59', modelCode: '5001', manufactureYear: 2024, modelYear: '2025', versionCode: 'v-xei', installments: [60, 24] }
-    const { erros, corpo } = montarSimulacao(form, 'opp1', HOJE)
+  it('monta o corpo só com contato e termos: CPF, cadastro e veículo vêm do CRM no servidor', () => {
+    const form = { ...formularioInicial(leadCompleto), installments: [60, 24] }
+    const { erros, corpo } = montarSimulacao(form, leadCompleto, HOJE)
     expect(erros).toBeNull()
-    expect(corpo.terms).toEqual({ assetValue: 125000, downPayment: 30000, installments: [24, 60] })
-    expect(corpo.applicant).toMatchObject({ document: '52998224725', phone: '43999887766', hasDriverLicense: true })
-    expect(corpo.vehicle).toMatchObject({ manufactureYear: 2024, modelYear: 2025, versionCode: 'v-xei' })
-    expect(Object.keys(corpo)).toEqual(['opportunityId', 'applicant', 'vehicle', 'terms']) // sem lista de bancos: o contrato não aceita
+    expect(corpo).toEqual({ opportunityId: 'opp1', applicant: { name: 'Joana Lima', email: 'joana@example.invalid', phone: '43999887766' },
+      terms: { assetValue: 125000, downPayment: 30000, installments: [24, 60] } })
+    expect(JSON.stringify(corpo)).not.toMatch(/document|birth|vehicle|52998/)
   })
-  it('validações bloqueiam envio inválido', () => {
-    const { erros } = montarSimulacao({ ...formularioInicial(lead), cpf: '123', birthDate: '2012-01-01', downPayment: 200000, installments: [] }, 'opp1', HOJE)
-    expect(Object.keys(erros)).toEqual(expect.arrayContaining(['applicant.document', 'applicant.birthDate', 'terms.downPayment', 'terms.installments', 'vehicle.versionCode']))
+  it('validações bloqueiam envio: cadastro incompleto, veículo não salvo ou pendente, termos inválidos', () => {
+    const { erros } = montarSimulacao({ ...formularioInicial(lead), downPayment: 200000, installments: [] }, lead, HOJE)
+    expect(Object.keys(erros)).toEqual(expect.arrayContaining(['cliente.cpf', 'cliente.birthDate', 'veiculo', 'terms.downPayment', 'terms.installments']))
+    const pendente = { ...leadCompleto, vehicleInterest: 'CG 160', vehicleCatalogNeedsReview: true }
+    expect(montarSimulacao(formularioInicial(pendente), pendente, HOJE).erros).toHaveProperty('veiculo')
+  })
+  it('patchCliente: valida e envia só o que mudou; CPF só se digitado', () => {
+    const vazio = patchCliente(rascunhoCliente(lead), lead, ['cpf', 'birthDate', 'gender', 'state', 'city', 'hasDriverLicense'], HOJE)
+    expect(Object.keys(vazio.erros)).toEqual(['cpf', 'birthDate', 'gender', 'state', 'city', 'hasDriverLicense'])
+    const r = { cpf: '52998224725', birthDate: '1990-05-20', gender: 'male', state: 'PR', city: ' Cambé ', hasDriverLicense: 'nao' }
+    expect(patchCliente(r, lead, Object.keys(r), HOJE)).toEqual({ erros: null, patch: { document: '52998224725', birthDate: '1990-05-20', gender: 'male', state: 'PR', city: 'Cambé', hasDriverLicense: false } })
+    expect(patchCliente({ ...r, cpf: '52998224724' }, lead, ['cpf'], HOJE).erros).toEqual({ cpf: 'Informe um CPF válido.' })
+    expect(patchCliente({ ...r, birthDate: '2012-01-01' }, lead, ['birthDate'], HOJE).erros.birthDate).toMatch(/18 e 100/)
+    // Cadastro existente: CPF em branco mantém o atual; só a cidade mudou.
+    const atual = rascunhoCliente(leadCompleto)
+    expect(atual.cpf).toBe('')
+    expect(patchCliente({ ...atual, city: 'Cambé' }, leadCompleto, ['cpf', 'birthDate', 'gender', 'state', 'city', 'hasDriverLicense'], HOJE)).toEqual({ erros: null, patch: { city: 'Cambé' } })
+  })
+  it('veículo salvo × pendente de revalidação × ausente', () => {
+    expect(veiculoSalvo(leadCompleto)).toBe(true)
+    expect(veiculoSalvo(lead)).toBe(false)
+    const pendente = { ...leadCompleto, vehicleCatalogNeedsReview: true }
+    expect(veiculoSalvo(pendente)).toBe(false); expect(veiculoPrecisaRevalidar(pendente)).toBe(true)
+    expect(veiculoPrecisaRevalidar(lead)).toBe(false)
+    expect(descreverVeiculo(leadCompleto)).toBe('TOYOTA COROLLA · XEI 2.0 FLEX')
   })
   it('taxa em fração ou percentual exibida igual', () => {
     expect(formatTaxa(0.0149)).toBe('1,49% a.m.')
@@ -144,19 +197,38 @@ describe('regras puras', () => {
 })
 
 // ------------------------------------------------------------------ fluxo na tela
+// Tela com "pai" que guarda a oportunidade (como o App): onLeadChanged atualiza o registro.
+let guardado = null
+function Tela({ inicial, usuario }) {
+  const [l, setL] = React.useState(inicial)
+  return <OpportunityFinancing lead={l} usuario={usuario} onLeadChanged={(novo) => { guardado = novo; setL(novo) }} />
+}
+beforeEach(() => {
+  guardado = null
+  // O servidor falso devolve só as chaves alteradas; aqui juntamos com a oportunidade atual, como o backend real.
+  const cli = api.salvarClienteFinanciamento.getMockImplementation()
+  const vei = api.salvarVeiculoFinanciamento.getMockImplementation()
+  api.salvarClienteFinanciamento.mockImplementation(async (id, d) => ({ ...(guardado || base), ...(await cli(id, d)) }))
+  api.salvarVeiculoFinanciamento.mockImplementation(async (id, d) => ({ ...(guardado || base), ...(await vei(id, d)), vehicleCatalogInterest: (guardado || base).vehicleInterest }))
+})
+let base = lead
 async function abrir(usuario = vendedor, l = lead) {
-  const r = render(<OpportunityFinancing lead={l} usuario={usuario} />)
+  base = l
+  const r = render(<Tela inicial={l} usuario={usuario} />)
   fireEvent.click(screen.getByRole('button', { name: /Financiamento/ }))
   await screen.findByRole('list', { name: 'Etapas do financiamento' })
   return r
 }
-function completarCliente() {
+async function completarCliente() {
+  fireEvent.click(screen.getByRole('button', { name: 'COMPLETAR DADOS' }))
   fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } })
   fireEvent.change(screen.getByLabelText('Data de nascimento'), { target: { value: '1990-05-20' } })
   fireEvent.click(within(screen.getByRole('group', { name: 'Sexo' })).getByRole('button', { name: 'Feminino' }))
   fireEvent.click(within(screen.getByRole('group', { name: 'Possui CNH' })).getByRole('button', { name: 'Sim' }))
   fireEvent.change(screen.getByLabelText('UF'), { target: { value: 'PR' } })
   fireEvent.change(screen.getByLabelText('Cidade'), { target: { value: 'Londrina' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar dados do cliente' }))
+  await waitFor(() => expect(screen.getByLabelText('Completude')).toHaveTextContent('9 de 9 ok'))
 }
 async function identificarVeiculo() {
   await waitFor(() => expect(within(screen.getByLabelText('Marca')).getByRole('option', { name: 'TOYOTA' })).toBeInTheDocument())
@@ -168,9 +240,14 @@ async function identificarVeiculo() {
   await waitFor(() => expect(within(screen.getByLabelText('Versão')).getByRole('option', { name: 'XEI 2.0 FLEX' })).toBeInTheDocument())
   fireEvent.change(screen.getByLabelText('Versão'), { target: { value: 'v-xei' } })
 }
+async function salvarVeiculo(nome = 'Salvar veículo') {
+  fireEvent.click(screen.getByRole('button', { name: nome }))
+  await screen.findByText('Veículo identificado para financiamento')
+}
 const continuar = () => fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
-async function irParaRevisao() {
-  await abrir(); completarCliente(); continuar(); await identificarVeiculo(); continuar()
+// Oportunidade com cadastro e veículo já salvos: Cliente → Veículo → Revisão sem redigitar nada.
+async function irParaRevisao(l = leadCompleto) {
+  await abrir(vendedor, l); continuar(); continuar()
   await screen.findByRole('button', { name: 'SIMULAR FINANCIAMENTO' })
 }
 
@@ -182,88 +259,134 @@ describe('acesso e abertura', () => {
     expect(screen.getByRole('button', { name: /Financiamento/ })).toBeInTheDocument()
   })
   it('recolhida por padrão: abrir a oportunidade não faz nenhuma chamada de financiamento', () => {
-    render(<OpportunityFinancing lead={lead} usuario={vendedor} />)
-    expect(api.listarSimulacoesFinanciamento).not.toHaveBeenCalled()
-    expect(api.getFinanciamentoMarcas).not.toHaveBeenCalled()
-    expect(api.getFinanciamentoBancos).not.toHaveBeenCalled()
+    render(<OpportunityFinancing lead={leadCompleto} usuario={vendedor} />)
+    for (const f of ['listarSimulacoesFinanciamento', 'getFinanciamentoMarcas', 'getFinanciamentoBancos', 'salvarClienteFinanciamento', 'salvarVeiculoFinanciamento']) expect(api[f]).not.toHaveBeenCalled()
   })
 })
 
 describe('etapa Cliente', () => {
-  it('reaproveita nome, telefone e e-mail do CRM e pede só o que falta', async () => {
+  it('oportunidade ANTIGA: contato do CRM preenchido, cadastro do cliente aparece como faltando', async () => {
     await abrir()
-    const crm = screen.getByRole('list', { name: 'Dados do CRM' })
-    expect(within(crm).getByText('Joana Lima')).toBeInTheDocument()
-    expect(within(crm).getByText('joana@example.invalid')).toBeInTheDocument()
-    expect(within(crm).getByText(/99988-7766/)).toBeInTheDocument()
-    // nada disso aparece como campo a preencher
-    expect(screen.queryByLabelText('Nome')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Telefone')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('E-mail')).not.toBeInTheDocument()
-    const faltam = screen.getByRole('list', { name: 'Dados a completar' })
-    for (const l of ['CPF', 'Data de nascimento', 'Sexo', 'UF', 'Cidade', 'Possui CNH']) expect(within(faltam).getByLabelText(l)).toBeInTheDocument()
+    const lista = screen.getByRole('list', { name: 'Dados do cliente' })
+    expect(within(lista).getByText('Joana Lima')).toBeInTheDocument()
+    expect(within(lista).getByText('joana@example.invalid')).toBeInTheDocument()
+    expect(within(lista).getByText(/99988-7766/)).toBeInTheDocument()
+    expect(within(lista).getAllByText('Falta')).toHaveLength(6)
     expect(screen.getByLabelText('Completude')).toHaveTextContent('3 de 9 ok')
-  })
-  it('se o CRM não tem e-mail, o e-mail entra como campo a preencher', async () => {
-    await abrir(vendedor, { ...lead, email: '' })
-    expect(within(screen.getByRole('list', { name: 'Dados a completar' })).getByLabelText('E-mail')).toHaveValue('')
-    expect(screen.getByLabelText('Completude')).toHaveTextContent('2 de 9 ok')
-  })
-  it('"Corrigir" permite editar um dado do CRM só para a simulação', async () => {
-    await abrir()
-    fireEvent.click(screen.getByRole('button', { name: 'Corrigir E-mail' }))
-    const email = screen.getByLabelText('E-mail')
-    expect(email).toHaveValue('joana@example.invalid')
-    fireEvent.change(email, { target: { value: 'joana.lima@example.invalid' } })
-    expect(api.updateOpportunity).not.toHaveBeenCalled()
-    expect(api.updateLeadData).not.toHaveBeenCalled()
-  })
-  it('CPF fica mascarado fora do foco', async () => {
-    await abrir()
-    const cpf = screen.getByLabelText('CPF')
-    fireEvent.focus(cpf); fireEvent.change(cpf, { target: { value: '52998224725' } })
-    expect(cpf).toHaveValue('529.982.247-25')
-    fireEvent.blur(cpf)
-    expect(cpf).toHaveValue('•••.•••.•••-25')
-  })
-  it('Continuar só habilita com todos os obrigatórios válidos; aviso LGPD presente', async () => {
-    await abrir()
-    expect(screen.getByText(/serão utilizados para realizar a simulação de financiamento junto às instituições financeiras habilitadas/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continuar' })).toBeDisabled()
-    completarCliente()
-    fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-24' } })
-    expect(screen.getByRole('button', { name: 'Continuar' })).toBeDisabled()
-    fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } })
+    expect(screen.queryByLabelText('CPF')).not.toBeInTheDocument() // formulário só ao clicar COMPLETAR DADOS
+  })
+  it('oportunidade NOVA COMPLETA: tudo preenchido do CRM, CPF mascarado, nada a digitar', async () => {
+    await abrir(vendedor, leadCompleto)
+    const lista = screen.getByRole('list', { name: 'Dados do cliente' })
     expect(screen.getByLabelText('Completude')).toHaveTextContent('9 de 9 ok')
+    expect(within(lista).getByText('•••.•••.•••-25')).toBeInTheDocument()
+    for (const t of ['20/05/1990', 'Feminino', 'PR', 'Londrina', 'Possui']) expect(within(lista).getByText(t)).toBeInTheDocument()
+    expect(within(lista).queryByText('Falta')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'COMPLETAR DADOS' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Editar dados do cliente' })).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument() // nenhuma duplicação: só leitura
     expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled()
-    expect(api.getFinanciamentoMarcas).not.toHaveBeenCalled() // catálogo só na etapa Veículo
   })
-})
-
-describe('etapa Cliente (cont.)', () => {
-  it('Sexo e CNH são botões; nenhuma chamada de simulação, catálogo ou banco nesta etapa', async () => {
+  it('dados incompletos: COMPLETAR DADOS mostra só os campos que faltam', async () => {
+    await abrir(vendedor, { ...lead, customerDocumentMasked: '•••.•••.•••-25', customerGender: 'male', customerState: 'PR' })
+    expect(screen.getByLabelText('Completude')).toHaveTextContent('6 de 9 ok')
+    fireEvent.click(screen.getByRole('button', { name: 'COMPLETAR DADOS' }))
+    const form = screen.getByRole('region', { name: 'Completar dados do cliente' })
+    expect(within(form).getByLabelText('Data de nascimento')).toBeInTheDocument()
+    expect(within(form).getByLabelText('Cidade')).toBeInTheDocument()
+    expect(within(form).getByRole('group', { name: 'Possui CNH' })).toBeInTheDocument()
+    expect(within(form).queryByLabelText('CPF')).not.toBeInTheDocument()
+    expect(within(form).queryByRole('group', { name: 'Sexo' })).not.toBeInTheDocument()
+  })
+  it('completar e salvar grava no cadastro (PATCH só com os campos do cliente) e libera o Continuar', async () => {
     await abrir()
-    const sexo = screen.getByRole('group', { name: 'Sexo' })
-    expect(within(sexo).getAllByRole('button').map((b) => b.textContent)).toEqual(['Masculino', 'Feminino'])
-    completarCliente()
-    expect(within(sexo).getByRole('button', { name: 'Feminino' })).toHaveAttribute('aria-pressed', 'true')
+    await completarCliente()
+    expect(api.salvarClienteFinanciamento).toHaveBeenCalledTimes(1)
+    expect(api.salvarClienteFinanciamento.mock.calls[0]).toEqual(['opp1', { document: '52998224725', birthDate: '1990-05-20', gender: 'female', state: 'PR', city: 'Londrina', hasDriverLicense: true }])
+    expect(guardado).toMatchObject({ customerDocumentMasked: '•••.•••.•••-25', customerCity: 'Londrina' })
+    expect(within(screen.getByRole('list', { name: 'Dados do cliente' })).getByText('•••.•••.•••-25')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Completar dados do cliente' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled()
+    expect(api.criarSimulacaoFinanciamento).not.toHaveBeenCalled()
+    expect(api.getFinanciamentoMarcas).not.toHaveBeenCalled()
+  })
+  it('validação local: CPF ou nascimento inválidos não chegam ao servidor', async () => {
+    await abrir()
+    fireEvent.click(screen.getByRole('button', { name: 'COMPLETAR DADOS' }))
+    fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-24' } })
+    fireEvent.change(screen.getByLabelText('Data de nascimento'), { target: { value: '2012-01-01' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar dados do cliente' }))
+    expect(await screen.findByText('Informe um CPF válido.')).toBeInTheDocument()
+    expect(screen.getByText('O cliente precisa ter entre 18 e 100 anos.')).toBeInTheDocument()
+    expect(api.salvarClienteFinanciamento).not.toHaveBeenCalled()
+  })
+  it('erro do servidor aparece no campo e nada é dado como salvo', async () => {
+    api.salvarClienteFinanciamento.mockRejectedValueOnce(Object.assign(new Error('Confira os campos destacados.'), { status: 400, body: { code: 'dados_invalidos', fields: { city: 'Informe a cidade.' } } }))
+    await abrir()
+    fireEvent.click(screen.getByRole('button', { name: 'COMPLETAR DADOS' }))
+    fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '52998224725' } })
+    fireEvent.change(screen.getByLabelText('Data de nascimento'), { target: { value: '1990-05-20' } })
+    fireEvent.click(within(screen.getByRole('group', { name: 'Sexo' })).getByRole('button', { name: 'Masculino' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Possui CNH' })).getByRole('button', { name: 'Não' }))
+    fireEvent.change(screen.getByLabelText('UF'), { target: { value: 'PR' } })
+    fireEvent.change(screen.getByLabelText('Cidade'), { target: { value: 'Cambé' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar dados do cliente' }))
+    expect(await screen.findByText('Informe a cidade.')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Completar dados do cliente' })).toBeInTheDocument()
+    expect(guardado).toBeNull()
+  })
+  it('CPF mascarado: na digitação fora do foco e no cadastro; editar não traz o CPF inteiro', async () => {
+    await abrir(vendedor, leadCompleto)
+    fireEvent.click(screen.getByRole('button', { name: 'Editar dados do cliente' }))
+    const cpf = screen.getByLabelText('CPF')
+    expect(cpf).toHaveValue('')
+    expect(cpf).toHaveAttribute('placeholder', expect.stringContaining('•••.•••.•••-25'))
+    fireEvent.focus(cpf); fireEvent.change(cpf, { target: { value: '11144477735' } })
+    expect(cpf).toHaveValue('111.444.777-35')
+    fireEvent.blur(cpf)
+    expect(cpf).toHaveValue('•••.•••.•••-35')
+    expect(document.body.textContent).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}/)
+  })
+  it('editar só a cidade envia só a cidade', async () => {
+    await abrir(vendedor, leadCompleto)
+    fireEvent.click(screen.getByRole('button', { name: 'Editar dados do cliente' }))
+    fireEvent.change(screen.getByLabelText('Cidade'), { target: { value: 'Cambé' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar dados do cliente' }))
+    await waitFor(() => expect(api.salvarClienteFinanciamento).toHaveBeenCalledWith('opp1', { city: 'Cambé' }))
+    expect(await within(screen.getByRole('list', { name: 'Dados do cliente' })).findByText('Cambé')).toBeInTheDocument()
+  })
+  it('sem e-mail no CRM: e-mail informado vale só para a simulação (oportunidade não tem edição cadastral)', async () => {
+    await abrir(vendedor, { ...leadCompleto, email: '' })
+    expect(screen.getByLabelText('Completude')).toHaveTextContent('8 de 9 ok')
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'joana.lima@example.invalid' } })
+    expect(screen.getByLabelText('Completude')).toHaveTextContent('9 de 9 ok')
+    expect(screen.getByText(/Vale só para esta simulação/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Corrigir Nome' }))
+    expect(screen.getByLabelText('Nome')).toHaveValue('Joana Lima')
+    expect(api.updateOpportunity).not.toHaveBeenCalled(); expect(api.updateLeadData).not.toHaveBeenCalled(); expect(api.salvarClienteFinanciamento).not.toHaveBeenCalled()
+  })
+  it('Sexo e CNH são botões; LGPD visível; nenhum POST, catálogo ou banco nesta etapa', async () => {
+    await abrir()
+    fireEvent.click(screen.getByRole('button', { name: 'COMPLETAR DADOS' }))
+    expect(within(screen.getByRole('group', { name: 'Sexo' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['Masculino', 'Feminino'])
+    expect(screen.getByText(/serão utilizados para realizar a simulação de financiamento junto às instituições financeiras habilitadas/)).toBeInTheDocument()
     expect(api.criarSimulacaoFinanciamento).not.toHaveBeenCalled()
     expect(api.getFinanciamentoMarcas).not.toHaveBeenCalled()
     expect(api.getFinanciamentoBancos).not.toHaveBeenCalled()
   })
-  it('indicador de etapas: atual em destaque e concluída com check', async () => {
-    await abrir(); completarCliente(); continuar()
+  it('indicador de etapas: atual em destaque e concluídas com check', async () => {
+    await abrir(vendedor, leadCompleto); continuar()
     const etapas = screen.getByRole('list', { name: 'Etapas do financiamento' })
     expect(within(etapas).getByRole('button', { name: /Veículo/ })).toHaveAttribute('aria-current', 'step')
     expect(within(etapas).getByRole('button', { name: /Cliente/ })).toHaveAttribute('data-concluida', 'sim')
-    expect(within(etapas).getByLabelText('concluída')).toBeInTheDocument()
     expect(within(etapas).getByRole('button', { name: /Resultados/ })).toBeDisabled()
   })
 })
 
 describe('etapa Veículo', () => {
-  it('mostra o veículo de interesse da oportunidade e identifica o mesmo veículo no catálogo em cascata', async () => {
-    await abrir(); completarCliente(); continuar()
+  it('veículo NÃO estruturado: mostra o veículo de interesse e identifica no catálogo em cascata; salva na oportunidade', async () => {
+    await abrir(vendedor, { ...lead, ...CADASTRO }); continuar()
     const bloco = screen.getByText('Veículo de interesse da oportunidade').closest('section')
     expect(within(bloco).getByText('POP 100')).toBeInTheDocument()
     expect(screen.getByLabelText('Modelo')).toBeDisabled()
@@ -272,37 +395,96 @@ describe('etapa Veículo', () => {
     expect(api.getFinanciamentoMarcas).toHaveBeenCalledWith('car')
     expect(api.getFinanciamentoModelos).toHaveBeenCalledWith('car', '59')
     expect(api.getFinanciamentoVersoes).toHaveBeenLastCalledWith('car', '59', '5001', 2024, 2025)
+    await salvarVeiculo()
+    expect(api.salvarVeiculoFinanciamento).toHaveBeenCalledWith('opp1', { type: 'car', brandCode: '59', modelCode: '5001', versionCode: 'v-xei', manufactureYear: 2024, modelYear: 2025, zeroKm: false })
+    expect(screen.getByText('TOYOTA COROLLA · XEI 2.0 FLEX')).toBeInTheDocument()
+    expect(guardado).toMatchObject({ vehicleVersionCode: 'v-xei', vehicleCatalogNeedsReview: false })
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled()
+    expect(api.criarSimulacaoFinanciamento).not.toHaveBeenCalled()
+  })
+  it('veículo JÁ estruturado: aparece pronto, sem consultar o catálogo e sem pedir de novo', async () => {
+    await abrir(vendedor, leadCompleto); continuar()
+    expect(screen.getByText('Veículo identificado para financiamento')).toBeInTheDocument()
+    expect(screen.getByText('TOYOTA COROLLA · XEI 2.0 FLEX')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Marca')).not.toBeInTheDocument()
+    expect(api.getFinanciamentoMarcas).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled()
   })
-  it('zero km em botões Sim/Não (padrão Não) e enviado com o código real escolhido', async () => {
-    api.criarSimulacaoFinanciamento.mockResolvedValue({ ...simBase, nextPollInMs: null })
-    await abrir(); completarCliente(); continuar(); await identificarVeiculo()
+  it('corrigir veículo: "Alterar veículo" abre o catálogo já preenchido e salva o novo', async () => {
+    await abrir(vendedor, leadCompleto); continuar()
+    fireEvent.click(screen.getByRole('button', { name: 'Alterar veículo' }))
+    await waitFor(() => expect(screen.getByLabelText('Marca')).toHaveValue('59'))
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeDisabled()
     const zero = screen.getByRole('group', { name: 'Zero km' })
-    expect(within(zero).getByRole('button', { name: 'Não' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(within(zero).getByRole('button', { name: 'Sim' }))
+    await waitFor(() => expect(screen.getByLabelText('Versão')).toHaveValue('v-xei'))
+    await salvarVeiculo()
+    expect(api.salvarVeiculoFinanciamento.mock.calls[0][1]).toMatchObject({ versionCode: 'v-xei', zeroKm: true })
+  })
+  it('vehicleInterest alterado: aviso de revalidação, códigos antigos não são usados até confirmar', async () => {
+    const pendente = { ...leadCompleto, vehicleInterest: 'CG 160 Titan', vehicleCatalogNeedsReview: true }
+    await abrir(vendedor, pendente)
+    const etapas = screen.getByRole('list', { name: 'Etapas do financiamento' })
+    expect(within(etapas).getByRole('button', { name: /Revisão/ })).toBeDisabled()
     continuar()
-    const veic = (await screen.findByText('Veículo', { selector: 'h4' })).closest('section')
-    expect(within(veic).getByText('Zero km').parentElement).toHaveTextContent('Sim')
-    fireEvent.click(screen.getByRole('button', { name: 'SIMULAR FINANCIAMENTO' }))
-    await waitFor(() => expect(api.criarSimulacaoFinanciamento).toHaveBeenCalledTimes(1))
-    expect(api.criarSimulacaoFinanciamento.mock.calls[0][0].vehicle).toEqual({ type: 'car', brandCode: '59', modelCode: '5001', versionCode: 'v-xei', manufactureYear: 2024, modelYear: 2025, zeroKm: true })
+    expect(screen.getByRole('alert')).toHaveTextContent('O veículo de interesse foi alterado. Confirme novamente os dados do veículo antes de uma nova simulação.')
+    expect(screen.getByText('Confirmar veículo para financiamento')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeDisabled()
+    await waitFor(() => expect(screen.getByLabelText('Versão')).toHaveValue('v-xei'))
+    await salvarVeiculo('Confirmar veículo')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled()
+  })
+  it('vehicleInterest alterado com a área aberta (pai atualiza a oportunidade) mostra o aviso', async () => {
+    const { rerender } = render(<OpportunityFinancing lead={leadCompleto} usuario={vendedor} />)
+    fireEvent.click(screen.getByRole('button', { name: /Financiamento/ }))
+    await screen.findByRole('list', { name: 'Etapas do financiamento' }); continuar()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    rerender(<OpportunityFinancing lead={{ ...leadCompleto, vehicleInterest: 'CG 160', vehicleCatalogNeedsReview: true }} usuario={vendedor} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('O veículo de interesse foi alterado')
   })
   it('trocar para moto recarrega marcas e limpa a seleção', async () => {
-    await abrir(); completarCliente(); continuar(); await identificarVeiculo()
+    await abrir(vendedor, { ...lead, ...CADASTRO }); continuar(); await identificarVeiculo()
     fireEvent.click(screen.getByRole('button', { name: 'Moto' }))
     await waitFor(() => expect(api.getFinanciamentoMarcas).toHaveBeenLastCalledWith('motorcycle'))
     expect(screen.getByLabelText('Marca')).toHaveValue('')
-    expect(screen.getByRole('button', { name: 'Continuar' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Salvar veículo' })).toBeDisabled()
   })
   it('sem veículo de interesse, orienta registrar em "Editar negócio"', async () => {
-    await abrir(vendedor, { ...lead, vehicleInterest: '' }); completarCliente(); continuar()
+    await abrir(vendedor, { ...lead, ...CADASTRO, vehicleInterest: '' }); continuar()
     expect(screen.getByText(/Não informado/)).toBeInTheDocument()
   })
-  it('servidor sem configuração: aviso claro e catálogo desabilitado', async () => {
+  it('servidor sem configuração: aviso claro, catálogo e salvar desabilitados', async () => {
     api.getFinanciamentoMarcas.mockRejectedValue(Object.assign(new Error('O financiamento ainda não está configurado no servidor.'), { status: 503, body: { code: 'nao_configurado' } }))
-    await abrir(); completarCliente(); continuar()
+    await abrir(vendedor, { ...lead, ...CADASTRO }); continuar()
     expect(await screen.findByText(/ainda não está configurado no servidor/)).toBeInTheDocument()
     expect(screen.getByLabelText('Marca')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Salvar veículo' })).toBeDisabled()
+  })
+})
+
+describe('jornada completa e persistência (fixture fictícia "Carlos Teste")', () => {
+  const carlos = { ...lead, id: 'opp-carlos', name: 'Carlos Teste', phone: '43999999999', email: 'teste@example.invalid', vehicleInterest: 'POP 100', negotiatedValue: null, assetValue: 15990, downPayment: 3000 }
+  it('completa, salva, fecha, reabre (F5) e Cliente e Veículo já vêm completos até a Revisão — sem POST', async () => {
+    const { unmount } = await abrir(vendedor, carlos)
+    await completarCliente()
+    continuar()
+    await identificarVeiculo(); await salvarVeiculo()
+    unmount() // fecha o modal
+    // "F5": a oportunidade volta do servidor como foi salva (fixture persistida).
+    const recarregada = { ...guardado }
+    expect(recarregada).toMatchObject({ customerDocumentMasked: '•••.•••.•••-25', customerBirthDate: '1990-05-20', vehicleVersionCode: 'v-xei' })
+    expect(JSON.stringify(recarregada)).not.toMatch(/52998224725/)
+    vi.clearAllMocks(); servidorFalso(); api.listarSimulacoesFinanciamento.mockResolvedValue([]); api.getFinanciamentoBancos.mockResolvedValue(BANCOS_API)
+    await abrir(vendedor, recarregada)
+    expect(screen.getByLabelText('Completude')).toHaveTextContent('9 de 9 ok')
+    continuar()
+    expect(screen.getByText('Veículo identificado para financiamento')).toBeInTheDocument()
+    continuar()
+    expect(await screen.findByRole('button', { name: 'SIMULAR FINANCIAMENTO' })).toBeInTheDocument()
+    const cliente = screen.getByText('Cliente', { selector: 'h4' }).closest('section')
+    expect(cliente).toHaveTextContent('Carlos Teste'); expect(cliente).toHaveTextContent('•••.•••.•••-25')
+    for (const f of ['salvarClienteFinanciamento', 'salvarVeiculoFinanciamento', 'getFinanciamentoMarcas', 'criarSimulacaoFinanciamento']) expect(api[f]).not.toHaveBeenCalled()
   })
 })
 
@@ -318,6 +500,7 @@ describe('etapa Revisão', () => {
     const veiculo = screen.getByText('Veículo', { selector: 'h4' }).closest('section')
     expect(within(veiculo).getByText('POP 100')).toBeInTheDocument()
     expect(within(veiculo).getByText('TOYOTA COROLLA · XEI 2.0 FLEX')).toBeInTheDocument()
+    expect(within(veiculo).getByText('Não', { selector: 'span' })).toBeInTheDocument()
     expect(within(veiculo).getByText('2024/2025')).toBeInTheDocument()
     const neg = screen.getByText('Negociação', { selector: 'h4' }).closest('section')
     expect(within(neg).getByText('R$ 129.900,00')).toBeInTheDocument() // valor do bem
@@ -329,7 +512,7 @@ describe('etapa Revisão', () => {
     expect(screen.getByRole('button', { name: '72x' })).toHaveAttribute('aria-pressed', 'true')
   })
   it('sem valor negociado, usa o valor do bem', async () => {
-    await abrir(vendedor, { ...lead, negotiatedValue: null }); completarCliente(); continuar(); await identificarVeiculo(); continuar()
+    await irParaRevisao({ ...leadCompleto, negotiatedValue: null })
     expect(await screen.findByLabelText('Valor da simulação')).toHaveValue('R$ 129.900,00')
     expect(screen.getByText('R$ 99.900,00')).toBeInTheDocument()
   })
@@ -352,7 +535,7 @@ describe('etapa Revisão', () => {
     expect(lista).toHaveTextContent('Banco Zeta Único')
     expect(screen.queryByText('Banco Xis Teste')).not.toBeInTheDocument()
   })
-  it('POST só acontece ao clicar SIMULAR FINANCIAMENTO, com o corpo completo', async () => {
+  it('POST só acontece ao clicar SIMULAR FINANCIAMENTO; corpo sem CPF nem veículo (o servidor usa o CRM)', async () => {
     api.criarSimulacaoFinanciamento.mockResolvedValue({ ...simBase, nextPollInMs: null })
     await irParaRevisao()
     await screen.findByRole('list', { name: 'Bancos' })
@@ -360,9 +543,8 @@ describe('etapa Revisão', () => {
     fireEvent.click(screen.getByRole('button', { name: 'SIMULAR FINANCIAMENTO' }))
     await waitFor(() => expect(api.criarSimulacaoFinanciamento).toHaveBeenCalledTimes(1))
     const corpo = api.criarSimulacaoFinanciamento.mock.calls[0][0]
-    expect(corpo).toMatchObject({ opportunityId: 'opp1', terms: { assetValue: 125000, downPayment: 30000, installments: [24, 36, 48, 60] },
-      applicant: { name: 'Joana Lima', email: 'joana@example.invalid', phone: '43999887766', document: '52998224725' },
-      vehicle: { type: 'car', brandCode: '59', modelCode: '5001', versionCode: 'v-xei', manufactureYear: 2024, modelYear: 2025 } })
+    expect(corpo).toEqual({ opportunityId: 'opp1', terms: { assetValue: 125000, downPayment: 30000, installments: [24, 36, 48, 60] },
+      applicant: { name: 'Joana Lima', email: 'joana@example.invalid', phone: '43999887766' } })
     expect(await screen.findByText('3 de 8')).toBeInTheDocument() // navegou para Resultados
   })
   it('duplo clique em SIMULAR FINANCIAMENTO gera um único POST', async () => {
@@ -376,6 +558,14 @@ describe('etapa Revisão', () => {
     resolver({ ...simBase, nextPollInMs: null })
     expect(await screen.findByText('3 de 8')).toBeInTheDocument()
     expect(api.criarSimulacaoFinanciamento).toHaveBeenCalledTimes(1)
+  })
+  it('servidor recusa veículo pendente (409): tela passa a pedir a revalidação', async () => {
+    api.criarSimulacaoFinanciamento.mockRejectedValue(Object.assign(new Error('O veículo de interesse foi alterado. Confirme novamente os dados do veículo antes de uma nova simulação.'), { status: 409, body: { code: 'veiculo_revalidar' } }))
+    await irParaRevisao()
+    fireEvent.click(screen.getByRole('button', { name: 'SIMULAR FINANCIAMENTO' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'SIMULAR FINANCIAMENTO' })).toBeDisabled())
+    fireEvent.click(screen.getAllByRole('button', { name: 'Alterar' })[1])
+    expect(await screen.findByText('Confirmar veículo para financiamento')).toBeInTheDocument()
   })
   it('navegar entre etapas (Alterar, Voltar, Continuar) não envia nada', async () => {
     await irParaRevisao()
@@ -493,13 +683,19 @@ describe('etapa Resultados', () => {
   })
   it('reabrir mostra a última simulação guardada sem nova consulta; "Nova simulação" volta à revisão', async () => {
     api.listarSimulacoesFinanciamento.mockResolvedValue([{ ...simBase, status: 'completed', terminal: true, nextPollInMs: null, results: [] }])
-    render(<OpportunityFinancing lead={lead} usuario={vendedor} />)
+    render(<Tela inicial={lead} usuario={vendedor} />)
     fireEvent.click(screen.getByRole('button', { name: /Financiamento/ }))
     expect(await screen.findByText('Processamento concluído')).toBeInTheDocument()
     expect(api.getSimulacaoFinanciamento).not.toHaveBeenCalled()
     expect(api.criarSimulacaoFinanciamento).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Nova simulação' }))
-    expect(await screen.findByLabelText('CPF')).toBeInTheDocument() // dados pessoais não ficam guardados: começa pelo Cliente
+    expect(await screen.findByText('COMPLETAR DADOS')).toBeInTheDocument() // oportunidade antiga sem cadastro: começa pelo Cliente
+  })
+  it('"Nova simulação" com cadastro e veículo salvos vai direto para a Revisão', async () => {
+    api.listarSimulacoesFinanciamento.mockResolvedValue([{ ...simBase, status: 'completed', terminal: true, nextPollInMs: null, results: [] }])
+    await abrir(vendedor, leadCompleto)
+    fireEvent.click(await screen.findByRole('button', { name: 'Nova simulação' }))
+    expect(await screen.findByRole('button', { name: 'SIMULAR FINANCIAMENTO' })).toBeInTheDocument()
   })
 })
 
@@ -519,7 +715,8 @@ describe('segurança, LGPD e layout', () => {
   })
   it('responsivo: grades empilham no celular e o comparativo rola na horizontal', async () => {
     await abrir()
-    expect(screen.getByRole('list', { name: 'Dados a completar' }).className).toMatch(/grid-cols-1 sm:grid-cols-2/)
+    fireEvent.click(screen.getByRole('button', { name: 'COMPLETAR DADOS' }))
+    expect(within(screen.getByRole('region', { name: 'Completar dados do cliente' })).getByRole('list').className).toMatch(/grid-cols-1 sm:grid-cols-2/)
     expect(screen.getByRole('list', { name: 'Etapas do financiamento' }).className).toMatch(/flex-wrap/)
     const comp = src('components/OpportunityFinancing.jsx')
     expect(comp).toMatch(/overflow-x-auto[^"]*" data-testid="comparativo"/)
@@ -527,6 +724,15 @@ describe('segurança, LGPD e layout', () => {
 })
 
 describe('integração com a oportunidade', () => {
+  it('LeadModal repassa onLeadChanged: salvar o cadastro atualiza a oportunidade no App', async () => {
+    const onLeadChanged = vi.fn()
+    base = lead
+    render(<LeadModal lead={lead} usuario={vendedor} onClose={() => {}} onMoveStage={() => {}} onLeadChanged={onLeadChanged} />)
+    fireEvent.click(screen.getByRole('button', { name: /Simular \/ ver simulações/ }))
+    await screen.findByRole('list', { name: 'Etapas do financiamento' })
+    await completarCliente()
+    expect(onLeadChanged).toHaveBeenCalledWith(expect.objectContaining({ id: 'opp1', customerDocumentMasked: '•••.•••.•••-25' }))
+  })
   it('LeadModal de oportunidade mostra Financiamento; lead livre não', () => {
     const { unmount } = render(<LeadModal lead={lead} usuario={vendedor} onClose={() => {}} onMoveStage={() => {}} onLeadChanged={() => {}} />)
     expect(screen.getByRole('region', { name: 'Financiamento' })).toBeInTheDocument()
