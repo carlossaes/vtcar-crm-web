@@ -119,6 +119,11 @@ export function getFinanciamentoVersoes(tipo, marca, modelo, anoFabricacao, anoM
   return request(`/api/financiamento/veiculos/versoes?${q({ tipo, marca, modelo, anoFabricacao, anoModelo })}`)
 }
 
+// Bancos habilitados da empresa na Zinix (informativo: o contrato não permite escolher subconjunto).
+export function getFinanciamentoBancos() {
+  return request('/api/financiamento/bancos')
+}
+
 export function criarSimulacaoFinanciamento(dados) {
   return request('/api/financiamento/simulacoes', { method: 'POST', body: JSON.stringify(dados) })
 }
