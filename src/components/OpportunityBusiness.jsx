@@ -20,7 +20,6 @@ export default function OpportunityBusiness({ lead, usuario, onLeadChanged }) {
     setSaving(true); setError('')
     try {
       const data = commercialPayload(form)
-      delete data.vehicleInterest
       onLeadChanged(await updateOpportunity(lead.id, data)); setEditing(false)
     }
     catch (err) { setError(err.message) }

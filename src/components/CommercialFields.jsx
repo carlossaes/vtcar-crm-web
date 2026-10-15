@@ -10,7 +10,7 @@ export default function CommercialFields({ form, setForm, readOnly = false, crea
     ...(field === 'hasTradeIn' && !value ? { tradeInVehicle: '', tradeInValue: null } : {}) }))
   const input = (field, title, numeric = false) => <label key={field} className="block text-[12px] text-ink2">
     {title}
-    {readOnly || (field === 'vehicleInterest' && !creation) ? <div className="text-[13.5px] text-ink mt-1">{numeric && field !== 'installmentsCount'
+    {readOnly ? <div className="text-[13.5px] text-ink mt-1">{numeric && field !== 'installmentsCount'
       ? (form[field] == null ? 'Não informado' : formatBRL(form[field])) : (form[field] ?? '') || 'Não informado'}</div>
       : numeric && field !== 'installmentsCount' ? <CurrencyInput label={title} className={control} value={form[field]} onChange={(value) => change(field, value)} />
       : <input aria-label={title} className={control} type="text" inputMode={numeric ? 'numeric' : undefined}
