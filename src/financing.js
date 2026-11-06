@@ -78,8 +78,11 @@ export function valorDaSimulacao(lead) {
 export function formularioInicial(lead) {
   const crm = dadosDoCrm(lead)
   const prazoDoNegocio = Number.isSafeInteger(lead?.installmentsCount) && lead.installmentsCount >= 1 && lead.installmentsCount <= 84 ? lead.installmentsCount : null
-  const prazos = [24, 36, 48, 60]
-  if (prazoDoNegocio && !prazos.includes(prazoDoNegocio)) prazos.push(prazoDoNegocio)
+  // NOVA-OPORTUNIDADE-V2-001: prazos escolhidos na criação (V2) têm prioridade.
+  const opcoes = Array.isArray(lead?.installmentOptions)
+    ? [...new Set(lead.installmentOptions.filter((n) => Number.isSafeInteger(n) && n >= 1 && n <= 84))].slice(0, 12) : []
+  const prazos = opcoes.length ? opcoes : [24, 36, 48, 60]
+  if (!opcoes.length && prazoDoNegocio && !prazos.includes(prazoDoNegocio)) prazos.push(prazoDoNegocio)
   const temVeiculo = lead?.vehicleVersionCode != null
   return {
     // Nome/telefone/e-mail: do CRM (correção pontual vale só para a simulação).

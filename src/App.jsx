@@ -14,6 +14,8 @@ import Login from './pages/Login'
 import TrocarSenha from './pages/TrocarSenha'
 import LeadModal from './components/LeadModal'
 import NovaOportunidadeModal from './components/NovaOportunidadeModal'
+import NovaOportunidadeV2Modal from './components/NovaOportunidadeV2Modal'
+import { usarTelaLegacy } from './novaOportunidadeV2'
 import { getToken, getUsuario, limparSessao, salvarSessao } from './auth'
 import { getApiBase, setApiBase, getLeads, updateLeadStage, meuUsuario, definirAoPerderSessao, listarUsuarios } from './api'
 
@@ -328,14 +330,26 @@ export default function App() {
         }}
       />
 
-      <NovaOportunidadeModal
-        open={oportunidadeModalOpen}
-        usuario={usuario}
-        vendedores={equipe}
-        onClose={() => setOportunidadeModalOpen(false)}
-        onCreated={handleOportunidadeCriada}
-        onAbrirExistente={handleAbrirExistente}
-      />
+      {/* NOVA-OPORTUNIDADE-V2-001: V2 é a padrão; ?legacy=1 força a tela antiga (intacta). */}
+      {usarTelaLegacy() ? (
+        <NovaOportunidadeModal
+          open={oportunidadeModalOpen}
+          usuario={usuario}
+          vendedores={equipe}
+          onClose={() => setOportunidadeModalOpen(false)}
+          onCreated={handleOportunidadeCriada}
+          onAbrirExistente={handleAbrirExistente}
+        />
+      ) : (
+        <NovaOportunidadeV2Modal
+          open={oportunidadeModalOpen}
+          usuario={usuario}
+          vendedores={equipe}
+          onClose={() => setOportunidadeModalOpen(false)}
+          onCreated={handleOportunidadeCriada}
+          onAbrirExistente={handleAbrirExistente}
+        />
+      )}
 
       <LeadModal
         lead={leadAberto}
