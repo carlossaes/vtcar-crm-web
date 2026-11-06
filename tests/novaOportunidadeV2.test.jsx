@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import NovaOportunidadeV2Modal from '../src/components/NovaOportunidadeV2Modal'
 import NovaOportunidadeModal from '../src/components/NovaOportunidadeModal'
-import { formacao, alternarPrazo, dadosClienteV2, montarCriacaoV2, usarTelaLegacy, ESTADO_INICIAL_V2, MAX_PRAZOS } from '../src/novaOportunidadeV2'
+import { formacao, alternarPrazo, dadosClienteV2, montarCriacaoV2, usarTelaLegacy, ESTADO_INICIAL_V2, MAX_PRAZOS, PRAZOS_V2 } from '../src/novaOportunidadeV2'
 import { formularioInicial } from '../src/financing'
 import { createLead, salvarClienteFinanciamento } from '../src/api'
 
@@ -14,7 +14,7 @@ vi.mock('../src/api', () => ({ createLead: vi.fn(), salvarClienteFinanciamento: 
 const vendedor = { id: 'v1', nome: 'Ana', papel: 'vendedor', ativo: true }
 const gerente = { id: 'g', nome: 'Kássia', papel: 'gerente', ativo: true }
 const HOJE = new Date('2026-11-06T12:00:00')
-const base = { ...ESTADO_INICIAL_V2, name: 'Carlos Teste', phone: '43999999999', origin: 'Loja', vehicleInterest: 'Vectra 2.2' }
+const base = { ...ESTADO_INICIAL_V2, name: 'Carlos Teste', phone: '43999999999', origin: 'Loja', vehicleInterest: 'Vectra 2.2', assetValue: 29900 }
 
 beforeEach(() => {
   createLead.mockImplementation(async (d) => ({ id: 'novo-1', recordType: 'opportunity', ownerId: 'v1', ...d }))
@@ -30,6 +30,8 @@ describe('regras da V2', () => {
     expect(formacao({ assetValue: 15000, downPayment: 15000 }).erro).toMatch(/menor que o valor do bem/)
     expect(formacao({ assetValue: 15000, downPayment: 20000 }).erro).toMatch(/menor que o valor do bem/)
     expect(formacao({ assetValue: null, downPayment: null })).toMatchObject({ financiar: null, erro: null })
+    expect(() => montarCriacaoV2({ ...base, assetValue: null }, { ehGerente: false })).toThrow('Informe o valor do bem.')
+    expect(PRAZOS_V2).toEqual([24, 36, 48, 60, 72, 84])
   })
   it('prazos: vários, ordenados, no máximo 12', () => {
     expect(alternarPrazo([48], 24)).toEqual([24, 48])
@@ -54,6 +56,7 @@ describe('regras da V2', () => {
     expect(() => montarCriacaoV2({ ...base, ownerId: '' }, { ehGerente: true })).toThrow(/responsável/)
     expect(montarCriacaoV2({ ...base, ownerId: 'v1' }, { ehGerente: true }).ownerId).toBe('v1')
     expect('installmentOptions' in montarCriacaoV2(base, { ehGerente: false })).toBe(false)
+    expect(montarCriacaoV2({ ...base, paymentComposition: '' }, { ehGerente: false }).paymentComposition).toBe('') // composição não é obrigatória
   })
   it('?legacy=1 força a tela antiga; sem o parâmetro a V2 é a padrão', () => {
     expect(usarTelaLegacy('?legacy=1')).toBe(true)
@@ -76,6 +79,7 @@ function preencherObrigatorios() {
   fireEvent.change(screen.getByLabelText('Telefone *'), { target: { value: '43999999999' } })
   fireEvent.change(screen.getByLabelText('Origem *'), { target: { value: 'Loja' } })
   fireEvent.change(screen.getByLabelText('Veículo de interesse *'), { target: { value: 'Vectra 2.2' } })
+  fireEvent.change(screen.getByLabelText('Valor do bem'), { target: { value: '29900' } })
 }
 const criar = () => fireEvent.click(screen.getByRole('button', { name: 'Criar oportunidade' }))
 
@@ -83,11 +87,16 @@ describe('tela V2', () => {
   beforeEach(() => { props.onCreated.mockReset() })
   it('mostra os campos do cliente, CNH como escolha explícita e NÃO mostra valor negociado', () => {
     render(<NovaOportunidadeV2Modal {...props} />)
-    for (const l of ['Nome *', 'Telefone *', 'E-mail', 'CPF', 'Nascimento', 'Cidade', 'UF', 'Origem *', 'Veículo de interesse *', 'Valor do bem', 'Entrada']) expect(screen.getByLabelText(l)).toBeInTheDocument()
+    for (const l of ['Nome *', 'Telefone *', 'E-mail', 'CPF', 'Nascimento', 'Sexo', 'Cidade', 'UF', 'Origem *', 'Veículo de interesse *', 'Valor do bem', 'Entrada']) expect(screen.getByLabelText(l)).toBeInTheDocument()
     const cnh = screen.getByRole('radiogroup', { name: 'Possui CNH?' })
-    expect(within(cnh).getAllByRole('radio').map((r) => r.textContent)).toEqual(['Sim', 'Não'])
-    expect(within(cnh).getAllByRole('radio').every((r) => r.getAttribute('aria-checked') === 'false')).toBe(true)
-    expect(screen.getByRole('radiogroup', { name: 'Sexo' })).toBeInTheDocument()
+    expect(within(cnh).getAllByRole('radio').map((r) => r.closest('label').textContent)).toEqual(['Sim', 'Não'])
+    expect(within(cnh).getAllByRole('radio').every((r) => !r.checked)).toBe(true)
+    expect(screen.getByLabelText('Sexo').tagName).toBe('SELECT')
+    // dados do cliente sem asterisco (não obrigatórios na criação); composição do pagamento também não
+    for (const l of ['CPF', 'Nascimento', 'Sexo', 'Cidade', 'UF', 'E-mail', 'Composição do pagamento']) expect(screen.getByText(l, { selector: 'label' }).textContent).not.toMatch(/\*/)
+    expect(screen.getByRole('complementary', { name: 'Requisitos da Zinix' })).toHaveTextContent('não impedem criar a oportunidade')
+    expect(screen.getByText(/será confirmado na etapa da simulação/)).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^\d+x$/ }).map((b) => b.textContent)).toEqual(['24x', '36x', '48x', '60x', '72x', '84x'])
     expect(screen.queryByText(/Valor negociado/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/Valor negociado/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Quantidade de parcelas')).not.toBeInTheDocument()
@@ -100,7 +109,9 @@ describe('tela V2', () => {
     fireEvent.change(screen.getByLabelText('Valor do bem'), { target: { value: '15000' } })
     fireEvent.change(screen.getByLabelText('Entrada'), { target: { value: '5000' } })
     expect(saida).toHaveTextContent('R$ 10.000,00')
-    fireEvent.click(screen.getByLabelText(/100% financiado/))
+    const cem = screen.getByRole('button', { name: /100% financiado/ })
+    fireEvent.click(cem)
+    expect(cem).toHaveAttribute('aria-pressed', 'true')
     expect(saida).toHaveTextContent('R$ 15.000,00')
     expect(screen.getByLabelText('Entrada')).toHaveValue('R$ 0,00')
   })
@@ -122,6 +133,7 @@ describe('tela V2', () => {
     await waitFor(() => expect(props.onCreated).toHaveBeenCalledTimes(1))
     const enviado = createLead.mock.calls[0][0]
     expect(enviado).toMatchObject({ name: 'Carlos Teste', phone: '43999999999', origin: 'Loja', vehicleInterest: 'Vectra 2.2', assetValue: 15000, downPayment: 5000, financingAmount: 10000, installmentOptions: [24, 48] })
+    expect(enviado.paymentComposition).toBe('')
     expect('negotiatedValue' in enviado).toBe(false)
     expect(salvarClienteFinanciamento).not.toHaveBeenCalled()
   })
@@ -131,11 +143,12 @@ describe('tela V2', () => {
     fireEvent.focus(cpf); fireEvent.change(cpf, { target: { value: '529.982.247-25' } }); fireEvent.blur(cpf)
     expect(cpf).toHaveValue('•••.•••.•••-25')
     fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Possui CNH?' })).getByRole('radio', { name: 'Não' }))
+    fireEvent.change(screen.getByLabelText('Sexo'), { target: { value: 'male' } })
     fireEvent.change(screen.getByLabelText('UF'), { target: { value: 'PR' } })
     criar()
     await waitFor(() => expect(props.onCreated).toHaveBeenCalledTimes(1))
     expect(JSON.stringify(createLead.mock.calls[0][0])).not.toMatch(/52998224725/)
-    expect(salvarClienteFinanciamento).toHaveBeenCalledWith('novo-1', { document: '52998224725', hasDriverLicense: false, state: 'PR' })
+    expect(salvarClienteFinanciamento).toHaveBeenCalledWith('novo-1', { document: '52998224725', gender: 'male', hasDriverLicense: false, state: 'PR' })
     expect(props.onCreated.mock.calls[0][0]).toMatchObject({ id: 'novo-1', customerDocumentMasked: '•••.•••.•••-25' })
   })
   it('CPF inválido bloqueia a criação até corrigir ou apagar', async () => {
@@ -166,7 +179,7 @@ describe('tela V2', () => {
   })
   it('gerente (ex.: Kássia) escolhe o responsável como hoje', async () => {
     render(<NovaOportunidadeV2Modal {...props} usuario={gerente} vendedores={[vendedor]} />); preencherObrigatorios()
-    fireEvent.change(screen.getByLabelText('Responsável comercial'), { target: { value: 'v1' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Responsável comercial' }), { target: { value: 'v1' } })
     criar()
     await waitFor(() => expect(createLead).toHaveBeenCalledTimes(1))
     expect(createLead.mock.calls[0][0].ownerId).toBe('v1')
@@ -184,6 +197,7 @@ describe('tela V2', () => {
   it('responsivo: grades empilham no celular', () => {
     render(<NovaOportunidadeV2Modal {...props} />)
     expect(screen.getByLabelText('CPF').closest('.grid').className).toMatch(/grid-cols-1 sm:grid-cols-2/)
+    expect(screen.getByRole('region', { name: 'Troca' }).parentElement.className).toMatch(/grid-cols-1 lg:/)
   })
 })
 

@@ -5,6 +5,8 @@ import { cpfValido, onlyDigits, idade, UFS, PRAZOS_SUGERIDOS } from './financing
 
 export { PRAZOS_SUGERIDOS }
 export const MAX_PRAZOS = 12
+// Prazos da referência visual aprovada. Todos dentro da regra da Zinix (1 a 84).
+export const PRAZOS_V2 = [24, 36, 48, 60, 72, 84]
 
 // A tela V2 é a padrão; ?legacy=1 no endereço força a tela antiga.
 export function usarTelaLegacy(search = typeof window !== 'undefined' ? window.location.search : '') {
@@ -69,6 +71,7 @@ export function dadosClienteV2(form, hoje = new Date()) {
 export function montarCriacaoV2(form, { ehGerente }) {
   const f = formacao(form)
   if (f.erro) throw new Error(f.erro)
+  if (f.bem == null) throw new Error('Informe o valor do bem.')
   if (!form.origin) throw new Error('Selecione a origem.')
   if (ehGerente && !form.ownerId) throw new Error('Selecione um responsável.')
   const hasTradeIn = form.hasTradeIn === true
