@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { StageBadge } from './Badge'
 import CurrencyInput from './CurrencyInput'
+import DataBR from './DataBR'
 import { createLead, salvarClienteFinanciamento } from '../api'
 import { ORIGENS } from './NovaOportunidadeModal'
 import { payments, formatBRL } from '../opportunity'
@@ -205,7 +206,7 @@ export default function NovaOportunidadeV2Modal({ open, usuario, vendedores = []
                           onChange={(e) => set('cpf', onlyDigits(e.target.value).slice(0, 11))} /></Icone>
                         {errosCliente?.cpf && <span className={erroCampo}>{errosCliente.cpf}</span>}</div>
                       <div><label className={rotulo} htmlFor="v2-nascimento">Nascimento</label>
-                        <Icone icon={Calendar}><input id="v2-nascimento" type="date" className={comIcone} value={form.birthDate} onChange={mudar('birthDate')} /></Icone>
+                        <Icone icon={Calendar}><DataBR id="v2-nascimento" className={comIcone} value={form.birthDate} onChange={(v) => set('birthDate', v)} /></Icone>
                         {errosCliente?.birthDate && <span className={erroCampo}>{errosCliente.birthDate}</span>}</div>
                       <div><label className={rotulo} htmlFor="v2-sexo">Sexo</label>
                         <Icone icon={Users} seta><select id="v2-sexo" className={`${comIcone} ${lista}`} value={form.gender} onChange={mudar('gender')}>

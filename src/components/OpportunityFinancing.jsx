@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Landmark, ChevronDown, ChevronUp, RefreshCw, AlertTriangle, CheckCircle2, Clock, Info, ShieldCheck, Plus, XCircle, Circle, Check, Pencil } from 'lucide-react'
 import CurrencyInput from './CurrencyInput'
+import DataBR from './DataBR'
 import {
   ETAPAS, UFS, PRAZOS_SUGERIDOS, TERMINAIS, formatCpf, maskCpf, onlyDigits, anosFabricacao, anosModelo, formularioInicial, checklistCliente,
   CAMPOS_CADASTRO, rascunhoCliente, patchCliente, veiculoSalvo, veiculoPrecisaRevalidar, descreverVeiculo,
@@ -126,7 +127,7 @@ function FormCadastro({ lead, campos, salvando, erroServidor, onSalvar, onCancel
         placeholder={lead.customerDocumentMasked ? `Atual ${lead.customerDocumentMasked} · digite só para trocar` : '000.000.000-00'}
         value={cpfFoco ? formatCpf(r.cpf) : maskCpf(r.cpf)} onFocus={() => setCpfFoco(true)} onBlur={() => setCpfFoco(false)}
         onChange={(e) => set('cpf', onlyDigits(e.target.value).slice(0, 11))} />
-      case 'birthDate': return <input aria-label="Data de nascimento" type="date" className={control} value={r.birthDate} onChange={(e) => set('birthDate', e.target.value)} />
+      case 'birthDate': return <DataBR aria-label="Data de nascimento" className={control} value={r.birthDate} onChange={(v) => set('birthDate', v)} />
       case 'gender': return <Opcoes label="Sexo" value={r.gender} onChange={(v) => set('gender', v)} opcoes={[['male', 'Masculino'], ['female', 'Feminino']]} />
       case 'state': return <select aria-label="UF" className={control} value={r.state} onChange={(e) => set('state', e.target.value)}>
         <option value="">Selecione</option>{UFS.map((u) => <option key={u} value={u}>{u}</option>)}</select>
