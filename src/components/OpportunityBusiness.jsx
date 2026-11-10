@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import CommercialFields from './CommercialFields'
 import { commercialPayload } from '../opportunity'
 import { updateOpportunity } from '../api'
+import { mostrarValorNegociado } from '../novaOportunidadeV2'
 
 export default function OpportunityBusiness({ lead, usuario, onLeadChanged }) {
   const [form, setForm] = useState(lead)
@@ -26,7 +27,7 @@ export default function OpportunityBusiness({ lead, usuario, onLeadChanged }) {
     finally { setSaving(false) }
   }
   return <form noValidate onSubmit={save} className="space-y-4">
-    <CommercialFields form={form} setForm={setForm} readOnly={!editing || !canEdit} />
+    <CommercialFields form={form} setForm={setForm} readOnly={!editing || !canEdit} valorNegociado={mostrarValorNegociado(lead)} />
     {error && <p role="alert" className="text-critical text-[13px]">{error}</p>}
     {canEdit && <div className="flex gap-3">
       {editing ? <><button key="save" disabled={saving} className="bg-brand text-brandInk rounded-control px-3 py-2" type="submit">{saving ? 'Salvando…' : 'Salvar negócio'}</button>

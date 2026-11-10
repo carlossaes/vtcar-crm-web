@@ -130,3 +130,32 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* =========================================================================
+   FINALIZAÇÃO V2 — tokens só da tela "Nova oportunidade" V2 (escopo .v2-tema).
+   Azul institucional + vermelho VT Car. Não altera nenhum token global.
+   ========================================================================= */
+.v2-tema {
+  --v2-navy: 160 195 240;
+  --v2-rotulo: 214 220 230;
+  --v2-icone: 140 152 170;
+  --v2-borda: 44 52 66;
+  --v2-campo: 62 72 90;
+  --v2-card: 22 26 33;
+  --v2-info: 24 40 68;
+  --v2-info-borda: 44 74 120;
+  --v2-azul: 70 140 230;
+  --v2-fundo: 14 17 22;
+}
+:root[data-theme='light'] .v2-tema {
+  --v2-navy: 12 39 84;
+  --v2-rotulo: 30 41 62;
+  --v2-icone: 70 86 112;
+  --v2-borda: 214 223 236;
+  --v2-campo: 196 207 223;
+  --v2-card: 249 251 254;
+  --v2-info: 233 242 253;
+  --v2-info-borda: 191 213 242;
+  --v2-azul: 29 98 196;
+  --v2-fundo: 244 247 251;
+}

@@ -5,7 +5,8 @@ const control = 'w-full bg-surface2 border border-line rounded-control px-3 py-2
 export function CommercialSection({ title, children }) {
   return <section className="space-y-3"><h3 className="text-micro uppercase font-semibold text-ink3">{title}</h3>{children}</section>
 }
-export default function CommercialFields({ form, setForm, readOnly = false, creation = false }) {
+// valorNegociado: 'editavel' (padrão, tela antiga), 'historico' (só leitura) ou 'oculto' (experiência V2).
+export default function CommercialFields({ form, setForm, readOnly = false, creation = false, valorNegociado = 'editavel' }) {
   const change = (field, value) => setForm((old) => ({ ...old, [field]: value,
     ...(field === 'hasTradeIn' && !value ? { tradeInVehicle: '', tradeInValue: null } : {}) }))
   const input = (field, title, numeric = false) => <label key={field} className="block text-[12px] text-ink2">
@@ -21,7 +22,9 @@ export default function CommercialFields({ form, setForm, readOnly = false, crea
   return <>
     <CommercialSection title="Veículo de interesse">{input('vehicleInterest', creation ? 'Veículo de interesse *' : 'Veículo de interesse')}</CommercialSection>
     <CommercialSection title="Formação do negócio"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {moneyFields.map(([field, title]) => input(field, title, true))}
+      {moneyFields.map(([field, title]) => field !== 'negotiatedValue' || valorNegociado === 'editavel' ? input(field, title, true)
+        : valorNegociado === 'historico' ? <div key={field} className="block text-[12px] text-ink2">{title} (histórico)
+          <div className="text-[13.5px] text-ink mt-1">{formatBRL(form[field])}</div></div> : null)}
     </div></CommercialSection>
     <CommercialSection title="Troca">
       <label className="block text-[12px] text-ink2">Tem veículo na troca?

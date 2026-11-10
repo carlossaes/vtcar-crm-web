@@ -8,6 +8,7 @@ import {
   ordenarBancos, montarComparativo, valorDaSimulacao, formatData, veiculoDesatualizado,
 } from '../financing'
 import { formatBRL } from '../formInputs'
+import { mostrarValorNegociado } from '../novaOportunidadeV2'
 import {
   getFinanciamentoMarcas, getFinanciamentoModelos, getFinanciamentoVersoes, getFinanciamentoBancos, criarSimulacaoFinanciamento,
   getSimulacaoFinanciamento, listarSimulacoesFinanciamento, salvarClienteFinanciamento, salvarVeiculoFinanciamento,
@@ -311,7 +312,9 @@ function EtapaRevisao({ form, set, lead, bancos, naoConfigurado, enviando, erroG
       </Bloco>
       <Bloco titulo="Negociação">
         <Linha rotulo="Valor do bem" valor={lead.assetValue > 0 ? formatBRL(lead.assetValue) : 'Não informado'} />
-        <Linha rotulo="Valor negociado" valor={lead.negotiatedValue > 0 ? formatBRL(lead.negotiatedValue) : 'Não informado'} />
+        {mostrarValorNegociado(lead) !== 'oculto' && (
+          <Linha rotulo={mostrarValorNegociado(lead) === 'historico' ? 'Valor negociado (histórico)' : 'Valor negociado'} valor={lead.negotiatedValue > 0 ? formatBRL(lead.negotiatedValue) : 'Não informado'} />
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <Campo label={`Valor da simulação${origem === 'negociado' ? ' (negociado)' : origem === 'bem' ? ' (valor do bem)' : ''}`} erro={n.erroValor && form.valor != null ? n.erroValor : null}>
             <CurrencyInput label="Valor da simulação" className={control} value={form.valor} onChange={(v) => set('valor', v)} />
