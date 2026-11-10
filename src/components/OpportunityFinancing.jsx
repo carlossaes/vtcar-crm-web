@@ -313,10 +313,10 @@ function EtapaRevisao({ form, set, lead, bancos, naoConfigurado, enviando, erroG
       <Bloco titulo="Negociação">
         <Linha rotulo="Valor do bem" valor={lead.assetValue > 0 ? formatBRL(lead.assetValue) : 'Não informado'} />
         {mostrarValorNegociado(lead) !== 'oculto' && (
-          <Linha rotulo={mostrarValorNegociado(lead) === 'historico' ? 'Valor negociado (histórico)' : 'Valor negociado'} valor={lead.negotiatedValue > 0 ? formatBRL(lead.negotiatedValue) : 'Não informado'} />
+          <Linha rotulo="Valor negociado" valor={lead.negotiatedValue > 0 ? formatBRL(lead.negotiatedValue) : 'Não informado'} />
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-          <Campo label={`Valor da simulação${origem === 'negociado' ? ' (negociado)' : origem === 'bem' ? ' (valor do bem)' : ''}`} erro={n.erroValor && form.valor != null ? n.erroValor : null}>
+          <Campo label={`Valor da simulação${origem === 'negociado' ? (mostrarValorNegociado(lead) === 'oculto' ? '' : ' (negociado)') : origem === 'bem' ? ' (valor do bem)' : ''}`} erro={n.erroValor && form.valor != null ? n.erroValor : null}>
             <CurrencyInput label="Valor da simulação" className={control} value={form.valor} onChange={(v) => set('valor', v)} />
           </Campo>
           <Campo label="Entrada" erro={n.erroEntrada}>

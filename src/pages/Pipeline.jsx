@@ -8,6 +8,7 @@ import { effectiveValue, formatBRL, pipelineIndicators } from '../opportunity'
 import { followUpPresentation, followUpIndicators, STATUS_LABEL } from '../followUp'
 import useNow from '../useNow'
 import useStageChange from '../components/useStageChange'
+import { mostrarValorNegociado } from '../novaOportunidadeV2'
 
 // O funil inteiro, incluindo as duas saidas (fechado e perdido).
 const COLUMNS = ['novo', 'qualificado', 'proposta', 'negociacao', 'fechado', 'perdido']
@@ -62,7 +63,7 @@ export function LeadCard({ lead, onOpen, onMoveRelative, dragging, onDragStart, 
       </div>
       <div className="text-[14px] font-semibold mt-2">{formatBRL(lead.negotiatedValue ?? lead.assetValue ?? 0)}</div>
       {lead.assetValue != null && lead.negotiatedValue != null && lead.assetValue !== lead.negotiatedValue && (
-        <div className="text-[11px] text-ink3"><div>Bem: {formatBRL(lead.assetValue)}</div><div>Negociado: {formatBRL(lead.negotiatedValue)}</div></div>
+        <div className="text-[11px] text-ink3"><div>Bem: {formatBRL(lead.assetValue)}</div>{mostrarValorNegociado(lead) !== 'oculto' && <div>Negociado: {formatBRL(lead.negotiatedValue)}</div>}</div>
       )}
       {lead.hasTradeIn && <div className="text-[11.5px] text-brand mt-1">Com troca</div>}
       <div className={`text-[11.5px] mt-1 ${followUp.textClass}`}>

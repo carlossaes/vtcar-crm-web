@@ -1,4 +1,5 @@
-// FINALIZAÇÃO V2 — "Valor negociado" oculto na experiência V2 (só apresentação),
+// FINALIZAÇÃO V2 — "Valor negociado" NUNCA aparece na experiência V2, nem em registro
+// antigo (regra definitiva do CTO, 10/11/2026); só apresentação, valor preservado;
 // acabamento visual sem mudança funcional e tela antiga (?legacy=1) preservada.
 // Dados FICTÍCIOS; API mockada (nenhuma chamada real).
 import React from 'react'
@@ -9,6 +10,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import OpportunityBusiness from '../src/components/OpportunityBusiness'
 import OpportunityFinancing from '../src/components/OpportunityFinancing'
 import NovaOportunidadeV2Modal from '../src/components/NovaOportunidadeV2Modal'
+import { LeadCard } from '../src/pages/Pipeline'
 import { mostrarValorNegociado } from '../src/novaOportunidadeV2'
 import * as api from '../src/api'
 
@@ -27,14 +29,18 @@ const nova = { id: 'opp-v2', name: 'Cliente Teste', phone: '43999999999', ownerI
 // Oportunidade ANTIGA com valor negociado gravado.
 const antiga = { ...nova, id: 'opp-antiga', negotiatedValue: 27500, downPayment: 5000, financingAmount: 22500, installmentOptions: undefined }
 
+const CAD_LEGACY = { customerDocumentMasked: '•••.•••.•••-25', customerBirthDate: '1990-05-20', customerGender: 'female', customerState: 'PR', customerCity: 'Londrina',
+  customerHasDriverLicense: true, email: 'teste@example.invalid', vehicleType: 'car', vehicleBrandCode: '56', vehicleBrandName: 'TOYOTA', vehicleModelCode: '5001',
+  vehicleModelName: 'COROLLA', vehicleVersionCode: 'v-xei', vehicleVersionName: 'XEI 2.0 FLEX', vehicleManufactureYear: 2024, vehicleModelYear: 2025,
+  vehicleZeroKm: false, vehicleCatalogInterest: 'Vectra 2.2', vehicleCatalogNeedsReview: false }
 const setLegacy = (on) => window.history.replaceState(null, '', on ? '/?legacy=1' : '/')
 afterEach(() => setLegacy(false))
 
 describe('regra de apresentação do Valor negociado', () => {
-  it('V2: oculto sem valor; histórico (só leitura) quando o registro antigo tem valor; tela antiga: como sempre', () => {
+  it('V2: sempre oculto (novo, zerado ou registro antigo com valor); tela antiga: como sempre', () => {
     expect(mostrarValorNegociado(nova, false)).toBe('oculto')
     expect(mostrarValorNegociado({ ...nova, negotiatedValue: 0 }, false)).toBe('oculto')
-    expect(mostrarValorNegociado(antiga, false)).toBe('historico')
+    expect(mostrarValorNegociado(antiga, false)).toBe('oculto')
     expect(mostrarValorNegociado(nova, true)).toBe('editavel')
     expect(mostrarValorNegociado(antiga, true)).toBe('editavel')
   })
@@ -66,24 +72,42 @@ describe('oportunidade criada (detalhes "Negócio") na V2', () => {
     expect(enviado).toMatchObject({ notes: 'Obs editada', assetValue: 29900, downPayment: 0, financingAmount: 29900, negotiatedValue: null })
     expect(salvo.notes).toBe('Obs editada')
   })
-  it('registro ANTIGO: valor negociado aparece só leitura como histórico e é preservado ao salvar (nenhuma perda)', async () => {
+  it('registro ANTIGO com negotiatedValue: nada de "Valor negociado" (nem histórico), e o valor é preservado ao salvar', async () => {
     api.updateOpportunity.mockImplementation(async (id, d) => ({ ...antiga, ...d }))
     render(<OpportunityBusiness lead={antiga} usuario={gerente} onLeadChanged={() => {}} />)
-    expect(screen.getByText('Valor negociado (histórico)')).toBeInTheDocument()
-    expect(screen.getByText('R$ 27.500,00')).toBeInTheDocument()
+    expect(screen.queryByText(/Valor negociado/)).not.toBeInTheDocument()
+    expect(screen.queryByText('R$ 27.500,00')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Editar negócio' }))
     expect(screen.queryByLabelText('Valor negociado')).not.toBeInTheDocument()
-    expect(screen.getByText('Valor negociado (histórico)')).toBeInTheDocument()
+    expect(screen.queryByText(/Valor negociado/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Salvar negócio' }))
     await waitFor(() => expect(api.updateOpportunity).toHaveBeenCalledTimes(1))
     expect(api.updateOpportunity.mock.calls[0][1].negotiatedValue).toBe(27500)
   })
-  it('tela antiga (?legacy=1): Valor negociado continua editável como antes', () => {
+  it('tela antiga (?legacy=1): Valor negociado continua visível e editável como antes', async () => {
     setLegacy(true)
-    render(<OpportunityBusiness lead={nova} usuario={vendedor} onLeadChanged={() => {}} />)
+    api.updateOpportunity.mockImplementation(async (id, d) => ({ ...antiga, ...d }))
+    render(<OpportunityBusiness lead={antiga} usuario={vendedor} onLeadChanged={() => {}} />)
     expect(screen.getByText('Valor negociado')).toBeInTheDocument()
+    expect(screen.getByText('R$ 27.500,00')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Editar negócio' }))
-    expect(screen.getByLabelText('Valor negociado')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Valor negociado'), { target: { value: '26000' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar negócio' }))
+    await waitFor(() => expect(api.updateOpportunity).toHaveBeenCalledTimes(1))
+    expect(api.updateOpportunity.mock.calls[0][1].negotiatedValue).toBe(26000)
+  })
+  it('tela antiga (?legacy=1): Revisão do Financiamento mostra Valor negociado', async () => {
+    setLegacy(true)
+    api.listarSimulacoesFinanciamento.mockResolvedValue([])
+    api.getFinanciamentoBancos.mockResolvedValue([])
+    render(<OpportunityFinancing lead={{ ...antiga, ...CAD_LEGACY }} usuario={vendedor} />)
+    fireEvent.click(screen.getByRole('button', { name: /Financiamento/ }))
+    await screen.findByRole('list', { name: 'Etapas do financiamento' })
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' })); fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    await screen.findByRole('button', { name: 'SIMULAR FINANCIAMENTO' })
+    const neg = screen.getByText('Negociação', { selector: 'h4' }).closest('section')
+    expect(within(neg).getByText('Valor negociado')).toBeInTheDocument()
+    expect(within(neg).getByText('Valor da simulação (negociado)')).toBeInTheDocument()
   })
   it('permissões inalteradas: vendedor de outra oportunidade não edita', () => {
     render(<OpportunityBusiness lead={{ ...nova, ownerId: 'outro' }} usuario={vendedor} onLeadChanged={() => {}} />)
@@ -92,10 +116,7 @@ describe('oportunidade criada (detalhes "Negócio") na V2', () => {
 })
 
 describe('Financiamento → Revisão na V2', () => {
-  const CAD = { customerDocumentMasked: '•••.•••.•••-25', customerBirthDate: '1990-05-20', customerGender: 'female', customerState: 'PR', customerCity: 'Londrina',
-    customerHasDriverLicense: true, email: 'teste@example.invalid', vehicleType: 'car', vehicleBrandCode: '56', vehicleBrandName: 'TOYOTA', vehicleModelCode: '5001',
-    vehicleModelName: 'COROLLA', vehicleVersionCode: 'v-xei', vehicleVersionName: 'XEI 2.0 FLEX', vehicleManufactureYear: 2024, vehicleModelYear: 2025,
-    vehicleZeroKm: false, vehicleCatalogInterest: 'Vectra 2.2', vehicleCatalogNeedsReview: false }
+  const CAD = CAD_LEGACY // mesmo cadastro fictício
   beforeEach(() => {
     api.listarSimulacoesFinanciamento.mockResolvedValue([])
     api.getFinanciamentoBancos.mockResolvedValue([{ code: 'bx', name: 'Banco Xis Teste', status: 'enabled', habilitado: true }])
@@ -114,11 +135,27 @@ describe('Financiamento → Revisão na V2', () => {
     expect(within(neg).queryByText(/Valor negociado/)).not.toBeInTheDocument()
     expect(screen.getByLabelText('Valor da simulação')).toHaveValue('R$ 29.900,00')
   })
-  it('registro antigo: valor negociado exibido como histórico e ainda usado na simulação (regra intacta)', async () => {
+  it('registro antigo com negotiatedValue: linha oculta, mas a regra interna da simulação continua usando o valor', async () => {
     const neg = await revisao(antiga)
-    expect(within(neg).getByText('Valor negociado (histórico)')).toBeInTheDocument()
+    expect(within(neg).queryByText(/Valor negociado/)).not.toBeInTheDocument()
+    expect(neg).not.toHaveTextContent(/negociado/i) // nem no rótulo "Valor da simulação (negociado)"
     expect(screen.getByLabelText('Valor da simulação')).toHaveValue('R$ 27.500,00')
     expect(api.criarSimulacaoFinanciamento).not.toHaveBeenCalled()
+  })
+})
+
+describe('Pipeline (card da oportunidade)', () => {
+  const NOW = new Date('2026-11-10T12:00:00-03:00')
+  const card = { ...antiga, assetValue: 30000, negotiatedValue: 27500, createdAt: '2026-11-01T10:00:00Z' }
+  it('V2: registro antigo não mostra "Negociado"; valores e totais não mudam', () => {
+    render(<LeadCard lead={card} now={NOW} />)
+    expect(screen.queryByText(/Negociado/)).not.toBeInTheDocument()
+    expect(screen.getByText('Bem: R$ 30.000,00')).toBeInTheDocument()
+  })
+  it('?legacy=1: card continua mostrando "Negociado" como antes', () => {
+    setLegacy(true)
+    render(<LeadCard lead={card} now={NOW} />)
+    expect(screen.getByText('Negociado: R$ 27.500,00')).toBeInTheDocument()
   })
 })
 

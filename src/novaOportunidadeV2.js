@@ -95,13 +95,12 @@ export function montarCriacaoV2(form, { ehGerente }) {
   return dados
 }
 
-// FINALIZAÇÃO V2 — "Valor negociado" deixa de ser apresentado na experiência V2.
-// Só APRESENTAÇÃO: o campo continua no modelo, nos payloads e nos dados antigos.
-// - tela antiga (?legacy=1): mostra como sempre;
-// - V2: oculto quando não informado (toda oportunidade criada na V2);
-//   registro ANTIGO que tem o valor continua exibindo-o, só leitura, como
-//   histórico, para não esconder informação que ainda entra na simulação.
+// FINALIZAÇÃO V2 — regra definitiva do produto (CTO, 10/11/2026):
+// na experiência V2 o conceito "Valor negociado" NÃO aparece em lugar nenhum,
+// nem para registros antigos que tenham negotiatedValue.
+// Só APRESENTAÇÃO: o valor continua no modelo, no JSON, nos payloads
+// (preservado ao salvar), em effectiveValue e na regra da simulação.
+// Tela antiga (?legacy=1): comportamento antigo, visível e editável.
 export function mostrarValorNegociado(registro, legacy = usarTelaLegacy()) {
-  if (legacy) return 'editavel'
-  return registro?.negotiatedValue > 0 ? 'historico' : 'oculto'
+  return legacy ? 'editavel' : 'oculto'
 }

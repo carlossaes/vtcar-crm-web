@@ -504,7 +504,9 @@ describe('etapa Revisão', () => {
     expect(within(veiculo).getByText('2024/2025')).toBeInTheDocument()
     const neg = screen.getByText('Negociação', { selector: 'h4' }).closest('section')
     expect(within(neg).getByText('R$ 129.900,00')).toBeInTheDocument() // valor do bem
-    expect(within(neg).getByText('R$ 125.000,00')).toBeInTheDocument() // valor negociado
+    // FINALIZAÇÃO V2 (regra definitiva do CTO): a linha "Valor negociado" não aparece na V2,
+    // mas o valor continua sendo usado internamente na simulação (asserção logo abaixo).
+    expect(within(neg).queryByText(/Valor negociado/)).not.toBeInTheDocument()
     expect(screen.getByLabelText('Valor da simulação')).toHaveValue('R$ 125.000,00') // negociado > 0
     expect(within(neg).getByText('R$ 95.000,00')).toBeInTheDocument() // a financiar
     for (const p of ['24x', '36x', '48x', '60x']) expect(screen.getByRole('button', { name: p })).toHaveAttribute('aria-pressed', 'true')
