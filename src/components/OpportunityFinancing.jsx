@@ -550,9 +550,14 @@ export default function OpportunityFinancing({ lead: leadProp, usuario, onLeadCh
   const [podeReenviar, setPodeReenviar] = useState(false)
   const [atualizando, setAtualizando] = useState(false)
   const [autoAte, setAutoAte] = useState(0)
-  const montado = useRef(true)
+  // false até o efeito rodar: no StrictMode (DEV) o React faz montagem → desmontagem → montagem,
+  // então o efeito precisa religar a flag a cada montagem (senão o catálogo fica em "Carregando...").
+  const montado = useRef(false)
   const enviandoRef = useRef(false) // trava síncrona contra duplo clique
-  useEffect(() => () => { montado.current = false }, [])
+  useEffect(() => {
+    montado.current = true
+    return () => { montado.current = false }
+  }, [])
 
   const set = useCallback((campo, valor) => setForm((f) => {
     const n = { ...f, [campo]: valor, [`_tocado_${campo}`]: true }
